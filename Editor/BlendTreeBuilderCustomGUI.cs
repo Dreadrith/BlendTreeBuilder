@@ -1,7 +1,6 @@
 ﻿using System;
 using UnityEditor;
 using UnityEngine;
-using static Thry.BetterTooltips;
 using Object = UnityEngine.Object;
 
 namespace DreadScripts.BlendTreeBulder

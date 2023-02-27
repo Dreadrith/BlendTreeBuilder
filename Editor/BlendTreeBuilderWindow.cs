@@ -8,7 +8,6 @@ using static DreadScripts.BlendTreeBulder.BlendTreeBuilderCustomGUI;
 using static DreadScripts.BlendTreeBulder.BlendTreeBuilderMain;
 using static DreadScripts.BlendTreeBulder.BlendTreeBuilderHelper;
 using System.Linq;
-using System.Text;
 
 namespace DreadScripts.BlendTreeBulder
 {
@@ -320,12 +319,8 @@ namespace DreadScripts.BlendTreeBulder
                                     GUILayout.FlexibleSpace();
                                     using (new IsolatedDisableScope(false))
                                     {
-                                        if (b.mayChangeBehaviour) GUILayout.Label(Content.warnIcon, Styles.iconButton, GUILayout.Width(18), GUILayout.Height(18));
-                                        if (b.reuseLayers.Count > 0)
-                                        {
-                                            string errorList = string.Join("\n", b.reuseLayers.Where(l => l != null).Select(l => l.name));
-                                            GUILayout.Label(new GUIContent(Content.errorIcon) { tooltip = $"Parameter is reused in other layers:\n{errorList}" }, Styles.iconButton, GUILayout.Width(18), GUILayout.Height(18));
-                                        }
+                                        if (!string.IsNullOrEmpty(b.warnLog)) GUILayout.Label(new GUIContent(Content.warnIcon){tooltip = b.warnLog}, Styles.iconButton, GUILayout.Width(18), GUILayout.Height(18));
+                                        if (!string.IsNullOrEmpty(b.errorLog)) GUILayout.Label(new GUIContent(Content.errorIcon) { tooltip = b.errorLog }, Styles.iconButton, GUILayout.Width(18), GUILayout.Height(18));
                                     }
 
                                     using (new BGColoredScope(b.isReplacing, Color.green, Color.grey))

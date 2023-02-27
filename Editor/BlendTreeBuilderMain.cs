@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -73,33 +72,12 @@ namespace DreadScripts.BlendTreeBulder
         public static OptimizationInfo GetOptimizationInfo(AnimatorController con)
         {
             OptimizationInfo info = new OptimizationInfo() { targetController = con, masterTree = GetMasterBlendTree(con) };
-            foreach (var layer in con.layers)
-                if (Branch.TryExtract(layer, out OptimizeBranch b))
-                {
-                    List<AnimatorControllerLayer> reuseLayers = new List<AnimatorControllerLayer>();
-                    AnimatorControllerParameter animParameter = con.parameters.FirstOrDefault(p => p.name == b.baseBranch.parameter);
-                    if (animParameter == null || animParameter.type != AnimatorControllerParameterType.Float)
-                    {
-                        foreach (var layer2 in con.layers)
-                        {
-                            bool parameterReused = false;
-                            if (layer2.stateMachine == layer.stateMachine) continue;
-                            layer2.stateMachine.Iteratetransitions(t => parameterReused = t.conditions.Any(c => c.parameter == b.baseBranch.parameter));
-                            if (parameterReused) reuseLayers.Add(layer2);
-                        }
-                        if (reuseLayers.Count > 0) b.isActive = false;
-                    }
-                    //Add this to OptBranch error log instead
-                    else
-                    {
-                        RedLog($"Parameter {b.baseBranch.parameter} not found in the controller!");
-                        b.isActive = false;
-                    }
-
-                    b.reuseLayers = reuseLayers;
+            for (int i = 0; i < con.layers.Length; i++)
+            {
+                if (OptimizeBranch.TryExtract(con, i, out OptimizeBranch b))
                     info.Add(b);
-                }
-            
+            }
+
             return info;
         }
         public static void ApplyOptimization(OptimizationInfo info)
