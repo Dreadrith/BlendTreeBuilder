@@ -140,27 +140,29 @@ namespace DreadScripts.BlendTreeBulder
                         if (!success) return false;
 
                         AnimatorControllerParameter animParameter = controller.parameters.FirstOrDefault(p => p.name == parameter);
-                        if (animParameter == null || animParameter.type != AnimatorControllerParameterType.Float)
+                        if (animParameter != null)
                         {
-                            bool wasReused = false;
-                            foreach (var layer2 in controller.layers)
+                            if( animParameter.type != AnimatorControllerParameterType.Float)
                             {
-                                if (layer2.stateMachine == layer.stateMachine) continue;
-
-                                bool parameterReused = false;
-                                layer2.stateMachine.Iteratetransitions(t => parameterReused = t.conditions.Any(c => c.parameter == parameter));
-                               
-                                if (!parameterReused) continue;
-                                if (!wasReused)
+                                bool wasReused = false;
+                                foreach (var layer2 in controller.layers)
                                 {
-                                    wasReused = true;
-                                    errorReport.Append("\n- Non-Float Parameter is reused in other layers: ");
-                                }
+                                    if (layer2.stateMachine == layer.stateMachine) continue;
 
-                                errorReport.Append($"[{layer2.name}]");
+                                    bool parameterReused = false;
+                                    layer2.stateMachine.Iteratetransitions(t => parameterReused = t.conditions.Any(c => c.parameter == parameter));
+
+                                    if (!parameterReused) continue;
+                                    if (!wasReused)
+                                    {
+                                        wasReused = true;
+                                        errorReport.Append("\n- Non-Float Parameter is reused in other layers: ");
+                                    }
+
+                                    errorReport.Append($"[{layer2.name}]");
+                                }
                             }
                         }
-                        //Add this to OptBranch error log instead
                         else errorReport.AppendLine($"\nParameter {parameter} not found in the controller!");
                         
 
