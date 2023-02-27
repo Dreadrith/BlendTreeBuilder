@@ -28,6 +28,12 @@ On the second step, in the optimize tab, you're given details on what will be ha
 
 ![optimize window](https://github.com/Dreadrith/BlendTreeBuilder/raw/main/media~/wind2.png)
 
+### Notes
+You should almost always make backups in case something doesn't work right.  
+After running the the tool, you should test whether they work with [this emulator](https://github.com/jellejurre/Av3Emulator/tree/add-parameter-mismatch).  
+It's important to use the fork! The original does not support parameter mismatching yet.  
+If something doesn't work, you can go back to optimize the original again and disable 'Active' for the toggles that didn't work.
+
 ### Warning
 The optimizer does not take into account layer priority. If an optimized toggle has overlapping clips with another clip, there may be change in behaviour where properties get overwritten.
 
