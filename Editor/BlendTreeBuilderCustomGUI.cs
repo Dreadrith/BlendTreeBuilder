@@ -139,7 +139,8 @@ namespace DreadScripts.BlendTreeBulder
             public static readonly GUIContent greenLightIcon = EditorGUIUtility.IconContent("greenLight");
             public static readonly GUIContent orangeLightIcon = EditorGUIUtility.IconContent("orangeLight");
             public static readonly GUIContent backIcon = EditorGUIUtility.IconContent("back");
-            public static readonly GUIContent warnIcon = new GUIContent(EditorGUIUtility.IconContent("console.warnicon.sml")){tooltip = "Transitions are not instant. This may change the behaviour of the toggle."};
+            public static readonly GUIContent infoIcon = EditorGUIUtility.IconContent("console.warnicon.inactive.sml");
+            public static readonly GUIContent warnIcon = EditorGUIUtility.IconContent("console.warnicon.sml");
             public static readonly GUIContent errorIcon = EditorGUIUtility.IconContent("CollabError");
             public static readonly GUIContent foldoutIconOff = EditorGUIUtility.IconContent("IN foldout");
             public static readonly GUIContent foldoutIconOn = EditorGUIUtility.IconContent("IN foldout on");

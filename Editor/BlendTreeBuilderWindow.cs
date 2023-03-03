@@ -340,7 +340,8 @@ namespace DreadScripts.BlendTreeBulder
                                     GUILayout.Label(b.displayType, Styles.typeLabel);
                                     using (new IsolatedDisableScope(false))
                                     {
-                                        if (!string.IsNullOrEmpty(b.warnLog)) GUILayout.Label(new GUIContent(Content.warnIcon){tooltip = b.warnLog}, Styles.iconButton, GUILayout.Width(18), GUILayout.Height(18));
+                                        if (!string.IsNullOrEmpty(b.infoLog)) GUILayout.Label(new GUIContent(Content.infoIcon) { tooltip = b.infoLog }, Styles.iconButton, GUILayout.Width(18), GUILayout.Height(18));
+                                        if (!string.IsNullOrEmpty(b.warnLog)) GUILayout.Label(new GUIContent(Content.warnIcon) { tooltip = b.warnLog }, Styles.iconButton, GUILayout.Width(18), GUILayout.Height(18));
                                         if (!string.IsNullOrEmpty(b.errorLog)) GUILayout.Label(new GUIContent(Content.errorIcon) { tooltip = b.errorLog }, Styles.iconButton, GUILayout.Width(18), GUILayout.Height(18));
                                     }
 

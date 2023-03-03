@@ -28,6 +28,7 @@ namespace DreadScripts.BlendTreeBulder
         public bool isReplacing = true;
         public bool canEdit = true;
         public bool foldout;
+        public string infoLog;
         public string warnLog;
         public string errorLog;
         public string displayType;
@@ -46,6 +47,7 @@ namespace DreadScripts.BlendTreeBulder
 
             string name = layer.name;
             string parameter = string.Empty;
+            StringBuilder infoReport = new StringBuilder();
             StringBuilder warnReport = new StringBuilder();
             StringBuilder errorReport = new StringBuilder();
 
@@ -88,11 +90,6 @@ namespace DreadScripts.BlendTreeBulder
                 }
                 default:
                 {
-                    //Remake this to be more dynamic
-                    //Allowing it to handle exclusive toggles
-                    //I.E: rather than only 2 states, allow checking for as many states as there are, as long as the parameter and destination rules match
-
-
                     HashSet<AnimatorState> visitedStates = new HashSet<AnimatorState>();
                     Dictionary<float, AnimatorState> endStates = new Dictionary<float, AnimatorState>();
 
@@ -101,6 +98,7 @@ namespace DreadScripts.BlendTreeBulder
                     bool Failure() => !(success = false);
                     bool foundBehaviours = false;
                     bool foundLoopingZeroSpeed = false;
+                    bool foundNonInstantTransitions = false;
 
                     layer.stateMachine.Iteratetransitions(t =>
                     {
@@ -156,7 +154,10 @@ namespace DreadScripts.BlendTreeBulder
                                     warnReport.AppendLine("\n- Layer contains a looping motion on a state with 0 speed. Blendtrees can't have 0 speed so speed is set to -1 which may be undesirable on a looping animation.");
                                 }
                             }
-                           
+
+
+
+
 
                             if (!foundBehaviours && t.destinationState.behaviours != null && t.destinationState.behaviours.Length > 0)
                             {
@@ -166,8 +167,11 @@ namespace DreadScripts.BlendTreeBulder
 
                         }
 
-                        if (!mayChangeBehaviour && t is AnimatorStateTransition t2 && ((t2.hasExitTime && t2.exitTime > 0) || t2.duration > 0 || t2.offset > 0))
-                            mayChangeBehaviour = true;
+                        if (!foundNonInstantTransitions && t is AnimatorStateTransition t3 && ((t3.hasExitTime && t3.exitTime > 0) || t3.duration > 0 || t3.offset > 0))
+                        {
+                            foundNonInstantTransitions = true;
+                            infoReport.AppendLine("\n- Transitions are not instant. Behaviour may change when optimized.");
+                        }
 
 
                         if (!success && !string.IsNullOrEmpty(parameter) && endStates.Count >= 2) success = true;
@@ -226,15 +230,18 @@ namespace DreadScripts.BlendTreeBulder
                         childMotions = newChildren
                     };
 
+                    string infoLog = infoReport.ToString();
+                    if (!string.IsNullOrEmpty(infoLog)) infoLog = ("Behaviour may be different due to the following reasons:\n" + infoLog).Trim();
 
-                    string warnLog = warnReport.ToString();
-                    if (!string.IsNullOrEmpty(warnLog)) warnLog = ("Toggle behaviour may be different due to the following reasons:\n" + warnLog).Trim();
+
+                        string warnLog = warnReport.ToString();
+                    if (!string.IsNullOrEmpty(warnLog)) warnLog = ("Behaviour is likely to be different due to the following reasons:\n" + warnLog).Trim();
 
                     string errorLog = errorReport.ToString();
                     if (!string.IsNullOrEmpty(errorLog)) errorLog = ("Some stuff may break for these reasons:\n" + errorLog).Trim();
 
                     var active = string.IsNullOrEmpty(errorLog) && string.IsNullOrEmpty(warnLog);
-                    optBranch = new OptimizeBranch(baseBranch) {linkedLayer = layer, linkedLayerIndex = layerIndex, displayType = endStates.Count == 2 ? "Toggle" : "Exclusive Toggle", isActive = active, warnLog = warnLog, errorLog = errorLog};
+                    optBranch = new OptimizeBranch(baseBranch) {linkedLayer = layer, linkedLayerIndex = layerIndex, displayType = endStates.Count == 2 ? "Toggle" : "Exclusive Toggle", isActive = active,infoLog = infoLog, warnLog = warnLog, errorLog = errorLog};
 
                     return true;
 
