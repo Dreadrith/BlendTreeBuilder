@@ -214,13 +214,14 @@ namespace DreadScripts.BlendTreeBulder
                     int currentIndex = 0;
                     foreach (var (threshold, state) in endStates)
                     {
-                        newChildren[currentIndex++] = new ChildMotion()
+                        newChildren[currentIndex++] = new ChildMotion
                         {
                             motion = state.motion,
-                            timeScale = state.speed,
-                            threshold = threshold != 0 ? threshold : -1 
+                            timeScale = state.speed != 0 ? state.speed : -1,
+                            threshold = threshold
                         };
                     }
+
 
 
                     var baseBranch = new Branch()
@@ -234,7 +235,7 @@ namespace DreadScripts.BlendTreeBulder
                     if (!string.IsNullOrEmpty(infoLog)) infoLog = ("Behaviour may be different due to the following reasons:\n" + infoLog).Trim();
 
 
-                        string warnLog = warnReport.ToString();
+                    string warnLog = warnReport.ToString();
                     if (!string.IsNullOrEmpty(warnLog)) warnLog = ("Behaviour is likely to be different due to the following reasons:\n" + warnLog).Trim();
 
                     string errorLog = errorReport.ToString();

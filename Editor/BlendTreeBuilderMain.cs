@@ -54,7 +54,7 @@ namespace DreadScripts.BlendTreeBulder
             con.ReadyParameter(WEIGHTONE_PARAMETER_NAME, AnimatorControllerParameterType.Float, 1);
 
             var m = con.AddLayer(con.MakeUniqueLayerName("BTB/MasterTree"), 1).stateMachine;
-            var s = m.AddState("Master BlendTree (WD On)", new Vector3(50, 160));
+            var s = m.AddState("Master BlendTree (WD On)", new Vector3(30, 160));
             var tree = s.CreateBlendTreeInState($"{con.name} MasterTree");
             tree.blendType = BlendTreeType.Direct;
 
@@ -150,7 +150,7 @@ namespace DreadScripts.BlendTreeBulder
 
             FillTreeWithEmpty(masterTree);
 
-            BlendTreeBuilderMenuItem.FixTreeSpeed(masterTree, false);
+           // BlendTreeBuilderMenuItem.FixTreeSpeed(masterTree, false);
 
             GreenLog("Successfully applied optimization!");
         }
@@ -164,6 +164,7 @@ namespace DreadScripts.BlendTreeBulder
             {
                 BlendTree newTree = new BlendTree()
                 {
+                    useAutomaticThresholds = false,
                     name = branch.name,
                     blendParameter = branch.parameter,
                     children = branch.childMotions

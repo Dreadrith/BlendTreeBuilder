@@ -24,7 +24,20 @@ namespace DreadScripts.BlendTreeBulder
         private static Vector2 scroll;
 
         private static BlendTree masterBlendtree;
-        private static AnimatorController fxController;
+        private static AnimatorController _fxController;
+
+        private static AnimatorController fxController
+        {
+            get => _fxController;
+            set
+            {
+                if (_fxController != value)
+                {
+                    _fxController = value;
+                    currentOptInfo = null;
+                }
+            }
+        }
         private static VRCExpressionParameters exParameters;
         private static OptimizationInfo _currentOptInfo;
         private static bool shouldRepaint;
@@ -111,7 +124,7 @@ namespace DreadScripts.BlendTreeBulder
             }
         }
 
-        private void DrawAvatarReadyStep()
+        /*private void DrawAvatarReadyStep()
         {
             ResetStepsIf(!avatar, false);
             using (new TitledScope("Prepare your Avatar"))
@@ -134,11 +147,11 @@ namespace DreadScripts.BlendTreeBulder
                         ref exParameters, fieldLabel2,
                         () => { exParameters = avatar.ReadyExpressionParameters(GENERATED_ASSETS_PATH); }, 
                         "Ready Expression Parameters");
-                }*/
+                }#1#
 
                 DrawNextButton(fxController);
             }
-        }
+        }*/
 
 
         private void DrawMasterTreeReadyStep()
@@ -189,14 +202,19 @@ namespace DreadScripts.BlendTreeBulder
                     avatar = tempAvatar;
 
                 #endregion
+                var tempController = fxController;
 
-                if (fxController) DrawValidatedField("Controller is ready for use!", ref fxController, fieldLabel2);
+                EditorGUI.BeginChangeCheck();
+                if (fxController) DrawValidatedField("Controller is ready for use!", ref tempController, fieldLabel2);
                 else
                 {
                     DrawWarningField("FX Controller is not setup on the Avatar",
-                        ref fxController, fieldLabel2, !avatar || true ? (Action)null : () => { fxController = avatar.ReadyPlayableLayer(VRCAvatarDescriptor.AnimLayerType.FX, GENERATED_ASSETS_PATH); },
+                        ref tempController, fieldLabel2, !avatar || true ? (Action)null : () => { fxController = avatar.ReadyPlayableLayer(VRCAvatarDescriptor.AnimLayerType.FX, GENERATED_ASSETS_PATH); },
                         "Ready FX");
                 }
+
+                if (EditorGUI.EndChangeCheck())
+                    fxController = tempController;
 
                 /*
                 if (exParameters) DrawValidatedField("Expression Parameters are ready for use!", ref exParameters, fieldLabel3);
@@ -447,7 +465,7 @@ namespace DreadScripts.BlendTreeBulder
         private static void OnAvatarChanged()
         {
             if (!avatar) return;
-            if (!fxController) fxController = avatar.GetPlayableLayer(VRCAvatarDescriptor.AnimLayerType.FX);
+            fxController = avatar.GetPlayableLayer(VRCAvatarDescriptor.AnimLayerType.FX);
             if (!exParameters) exParameters = avatar.expressionParameters;
             masterBlendtree = GetMasterBlendTree(avatar);
         }
