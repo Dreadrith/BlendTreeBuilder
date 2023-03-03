@@ -284,8 +284,9 @@ namespace DreadScripts.BlendTreeBulder
                     cm.stateMachine.Iteratetransitions(transitionAction);
         }
 
-        internal static void IterateTreeChildren(this BlendTree tree, System.Func<ChildMotion, ChildMotion> func, bool deep = true)
+        internal static void IterateTreeChildren(this BlendTree tree, System.Func<ChildMotion, ChildMotion> func, bool deep = true, bool undo = false)
         {
+            if (undo) Undo.RecordObject(tree, "IterateTreeUndo");
             ChildMotion[] children = tree.children;
             for (int i = 0; i < children.Length; i++)
             {
@@ -300,6 +301,111 @@ namespace DreadScripts.BlendTreeBulder
             tree.children = children;
         }
 
+        #endregion
+
+        #region Animation Stuff
+
+        public static (float, AnimationClip)[] KeyFrameSplitClip(AnimationClip clip)
+        {
+            var floatBinds = AnimationUtility.GetCurveBindings(clip);
+            var floatCurves = floatBinds.Select(bind => AnimationUtility.GetEditorCurve(clip, bind)).ToArray();
+
+            var objectBinds = AnimationUtility.GetObjectReferenceCurveBindings(clip);
+            var objectCurves = objectBinds.Select(bind => AnimationUtility.GetObjectReferenceCurve(clip, bind)).ToArray();
+
+            float[] usedTimes = floatCurves.SelectMany(c => c.keys.Select(k => k.time))
+                .Concat(objectCurves.SelectMany(c => c.Select(k => k.time))).Distinct().ToArray();
+
+            (float, AnimationClip)[] clipKeyFrames = new (float, AnimationClip)[usedTimes.Length];
+            for (int i = 0; i < usedTimes.Length; i++)
+            {
+                var time = usedTimes[i];
+                var newClip = new AnimationClip(){name = $"{clip.name}_{i}"};
+
+                for (int j = 0; j < floatBinds.Length; j++)
+                {
+                    var bind = floatBinds[j];
+                    var curve = floatCurves[j];
+                    newClip.SetCurve(bind.path, bind.type, bind.propertyName, new AnimationCurve(new Keyframe(0, curve.Evaluate(time))));
+                }
+
+                for (int j = 0; j < objectBinds.Length; j++)
+                {
+                    var bind = objectBinds[j];
+                    var keyArray = objectCurves[j];
+                    Object objectValue;
+
+                    //cringe code
+                    if (keyArray.GetIndexOf(k => k.time == time, out int exactIndex))
+                        objectValue = keyArray[exactIndex].value;
+                    else if (keyArray.GetIndexOf(k => k.time > time, out int higherIndex))
+                        objectValue = keyArray[higherIndex - 1].value;
+                    else objectValue = keyArray[keyArray.Length - 1].value;
+
+                    AnimationUtility.SetObjectReferenceCurve(newClip, bind, new ObjectReferenceKeyframe[] {new ObjectReferenceKeyframe() {time = time, value = objectValue}});
+                }
+
+                clipKeyFrames[i] = (time/clip.length, newClip);
+            }
+
+            return clipKeyFrames;
+        }
+
+
+        public static bool IsConstant(Motion m) => IsConstant(m as AnimationClip) && IsConstant(m as BlendTree);
+        public static bool IsConstant(AnimationClip clip)
+        {
+            if (!clip) return true;
+
+            EditorCurveBinding[] allCurves = AnimationUtility.GetCurveBindings(clip).Concat(AnimationUtility.GetObjectReferenceCurveBindings(clip)).ToArray();
+
+            for (int i = 0; i < allCurves.Length; i++)
+            {
+                EditorCurveBinding c = allCurves[i];
+
+                AnimationCurve floatCurve = AnimationUtility.GetEditorCurve(clip, c);
+                ObjectReferenceKeyframe[] objectCurve = AnimationUtility.GetObjectReferenceCurve(clip, c);
+                bool isFloatCurve = floatCurve != null;
+
+                bool oneStartKey = (isFloatCurve && floatCurve.keys.Length == 1 && floatCurve.keys[0].time == 0) || (!isFloatCurve && objectCurve.Length <= 1 && objectCurve[0].time == 0);
+                if (oneStartKey)
+                    continue;
+
+                if (isFloatCurve)
+                {
+                    float v1 = floatCurve.keys[0].value;
+                    float t1 = floatCurve.keys[0].time;
+                    for (int j = 1; j < floatCurve.keys.Length; j++)
+                    {
+                        var t2 = floatCurve.keys[j].time;
+                        if (floatCurve.keys[j].value != v1 || floatCurve.Evaluate((t1 + t2) / 2f) != v1)
+                            return false;
+                        t1 = t2;
+                    }
+                }
+                else
+                {
+                    Object v = objectCurve[0].value;
+                    if (objectCurve.Any(o => o.value != v))
+                        return false;
+                }
+
+            }
+            return true;
+        }
+
+        public static bool IsConstant(BlendTree tree)
+        {
+            if (!tree) return true;
+            bool isConstant = true;
+            tree.IterateTreeChildren(cm =>
+            {
+                if (isConstant && cm.motion is AnimationClip clip)
+                    isConstant &= IsConstant(clip);
+                return cm;
+            });
+            return isConstant;
+        }
         #endregion
 
         #region Asset Stuff
@@ -373,6 +479,14 @@ namespace DreadScripts.BlendTreeBulder
                     return false;
             }
         }
+
+
+        internal static void Deconstruct<TKey, TValue>(this KeyValuePair<TKey, TValue> kvp, out TKey key, out TValue value)
+        {
+            key = kvp.Key;
+            value = kvp.Value;
+        }
+
         #endregion
     }
 }

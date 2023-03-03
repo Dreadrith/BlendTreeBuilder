@@ -54,7 +54,7 @@ namespace DreadScripts.BlendTreeBulder
             con.ReadyParameter(WEIGHTONE_PARAMETER_NAME, AnimatorControllerParameterType.Float, 1);
 
             var m = con.AddLayer(con.MakeUniqueLayerName("BTB/MasterTree"), 1).stateMachine;
-            var s = m.AddState("Master BlendTree (WD On)");
+            var s = m.AddState("Master BlendTree (WD On)", new Vector3(50, 160));
             var tree = s.CreateBlendTreeInState($"{con.name} MasterTree");
             tree.blendType = BlendTreeType.Direct;
 
@@ -74,6 +74,7 @@ namespace DreadScripts.BlendTreeBulder
             OptimizationInfo info = new OptimizationInfo() { targetController = con, masterTree = GetMasterBlendTree(con) };
             for (int i = 0; i < con.layers.Length; i++)
             {
+                if (con.layers[i].name == LAYER_NAME_IDENTIFIER || con.layers[i].stateMachine.anyStateTransitions.Any(t => t && t.isExit && t.mute && t.name == LAYER_ANYSTATE_IDENTIFIER)) continue;
                 if (OptimizeBranch.TryExtract(con, i, out OptimizeBranch b))
                     info.Add(b);
             }
@@ -84,6 +85,7 @@ namespace DreadScripts.BlendTreeBulder
         {
             var con = info.targetController;
             if (!con) throw new NullReferenceException("Optimization target controller cannot be null!");
+            var folderPath = $"{BlendTreeBuilderWindow.GENERATED_ASSETS_PATH}/{con.name}";
 
             Undo.RecordObject(info.targetController, "Apply DBT Optimization");
             var masterTree = info.masterTree ?? GetOrGenerateMasterBlendTree(info.targetController);
@@ -99,51 +101,82 @@ namespace DreadScripts.BlendTreeBulder
                     var l = optBranch.linkedLayer;
                     if (con.layers.GetIndexOf(l2 => l.stateMachine == l2.stateMachine, out int index))
                     {
-                        Debug.Log($"Removed {l.name}");
+                        Debug.Log($"Removed Layer: {l.name}");
                         con.RemoveLayer(index);
                     }
                     else RedLog($"Couldn't find Layer to remove associated with {optBranch.baseBranch.name}!");
                 }
+
+                if (optBranch.isMotionTimed)
+                {
+                    var clip = optBranch.baseBranch.childMotions[0].motion as AnimationClip;
+                    if (!clip) continue;
+
+                    var clipKeyFrames = KeyFrameSplitClip(clip);
+
+                    try
+                    {
+                        AssetDatabase.StartAssetEditing();
+                        for (int j = 0; j < clipKeyFrames.Length; j++)
+                        {
+                            var clipPath = ReadyAssetPath(folderPath, $"{clipKeyFrames[j].Item2.name}.anim", true);
+                            AssetDatabase.CreateAsset(clipKeyFrames[j].Item2, clipPath);
+                        }
+                    }
+                    finally { AssetDatabase.StopAssetEditing(); }
+
+                    ChildMotion[] newChildren = new ChildMotion[clipKeyFrames.Length];
+                    for (int j = 0; j < clipKeyFrames.Length; j++)
+                    {
+                        newChildren[j] = new ChildMotion()
+                        {
+                            threshold = clipKeyFrames[j].Item1,
+                            motion = clipKeyFrames[j].Item2,
+                            timeScale = 1
+                        };
+                    }
+
+                    optBranch.baseBranch.childMotions = newChildren;
+                }
+
                 AppendBranch(masterTree, optBranch);
 
-                bool foundParameter = false;
-                for (int j = 0; j < parameters.Length; j++)
-                {
-                    if (parameters[j].name == optBranch.baseBranch.parameter)
-                    {
-                        parameters[j].type = AnimatorControllerParameterType.Float;
-                        foundParameter = true;
-                            break;
-                    }
-                }
-                if (!foundParameter) 
-                    con.ReadyParameter(optBranch.baseBranch.parameter, AnimatorControllerParameterType.Float, 0);
+                if (parameters.GetIndexOf(p => p.name == optBranch.baseBranch.parameter, out int paramIndex)) 
+                    parameters[paramIndex].type = AnimatorControllerParameterType.Float;
+                else con.ReadyParameter(optBranch.baseBranch.parameter, AnimatorControllerParameterType.Float, 0);
 
             }
             con.parameters = parameters;
 
             FillTreeWithEmpty(masterTree);
+
+            BlendTreeBuilderMenuItem.FixTreeSpeed(masterTree, false);
+
+            GreenLog("Successfully applied optimization!");
         }
 
         public static void AppendBranch(BlendTree targetTree, Branch branch)
         {
-            BlendTree newTree = new BlendTree()
+            Motion finalMotion;
+            if (branch.childMotions.Length == 1)
+                finalMotion = branch.childMotions[0].motion;
+            else
             {
-                name = branch.name,
-                blendParameter = branch.parameter,
-                children = new ChildMotion[]
+                BlendTree newTree = new BlendTree()
                 {
-                    new ChildMotion() {motion = branch.startMotion, timeScale = branch.startSpeed, threshold = 0,},
-                    new ChildMotion() {motion = branch.endMotion, timeScale = branch.endSpeed, threshold = 1}
-                }
-            };
-            CreateBlendTreeAsset(targetTree, newTree);
+                    name = branch.name,
+                    blendParameter = branch.parameter,
+                    children = branch.childMotions
+                };
+                CreateBlendTreeAsset(targetTree, newTree);
+                finalMotion = newTree;
+            }
 
             ChildMotion[] children = targetTree.children;
             ChildMotion newChild = new ChildMotion()
             {
                 directBlendParameter = WEIGHTONE_PARAMETER_NAME,
-                motion = newTree,
+                motion = finalMotion,
                 timeScale = 1
             };
 
@@ -177,7 +210,7 @@ namespace DreadScripts.BlendTreeBulder
 
         public static void FillTreeWithEmpty(BlendTree mainTree)
         {
-            var folderPath = BlendTreeBuilderWindow.GENERATED_ASSETS_PATH;
+            const string folderPath = BlendTreeBuilderWindow.GENERATED_ASSETS_PATH;
             var emptyClipPath = ReadyAssetPath(folderPath,"Empty Clip.anim", false);
             var emptyClip = AssetDatabase.LoadAssetAtPath<AnimationClip>(emptyClipPath);
             if (!emptyClip)
@@ -197,6 +230,11 @@ namespace DreadScripts.BlendTreeBulder
         private static void RedLog(string msg)
         {
             Debug.LogError($"<color=red>[BlendTreeBuilder] {msg}</color>");
+        }
+
+        private static void GreenLog(string msg)
+        {
+            Debug.Log($"<color=green>[BlendTreeBuilder] {msg}</color>");
         }
 
     }

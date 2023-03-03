@@ -234,29 +234,32 @@ namespace DreadScripts.BlendTreeBulder
             {
                 using (new GUILayout.HorizontalScope())
                 {
+                    using (new BGColoredScope(allActive, Color.grey, Color.green, ColorOrange))
+                        if (GUILayout.Button(new GUIContent("All Active", "Will be used during generation"), GUILayout.ExpandWidth(false)))
+                        {
+                            bool newState = ToggleBoolState(ref allActive);
+                            for (int i = 0; i < currentOptInfo.Count; i++)
+                                currentOptInfo[i].isActive = newState;
+                        }
+
+                    GUILayout.Space(65);
+                    EditorGUILayout.LabelField("Optimize", Styles.titleLabel);
+
                     using (new BGColoredScope(makeDuplicate, Color.green, Color.grey))
-                        if (GUILayout.Button(new GUIContent("Make Duplicate", "Replaces the FX with a duplicate"), GUILayout.Width(150)))
+                        if (GUILayout.Button(new GUIContent("Backup", "Creates a backup of the controller before optimizing."), GUILayout.ExpandWidth(false)))
                             makeDuplicate = !makeDuplicate;
 
-                    EditorGUILayout.LabelField("Optimize", Styles.titleLabel);
                     using (new EditorGUI.DisabledScope(currentOptInfo == null || currentOptInfo.Count == 0))
-                    {
-                        using (new BGColoredScope(allReplace, Color.grey, Color.green, ColorOrange))
-                            if (GUILayout.Button(new GUIContent("All Replace", "Replaces the FX with a duplicate"), GUILayout.ExpandWidth(false)))
-                            {
-                                bool newState = ToggleBoolState(ref allReplace);
-                                for (int i = 0; i < currentOptInfo.Count; i++)
-                                    currentOptInfo[i].isReplacing = newState;
-                            }
+                    using (new BGColoredScope(allReplace, Color.grey, Color.green, ColorOrange))
+                        if (GUILayout.Button(new GUIContent("All Replace", "Will remove the optimized layer on apply."), GUILayout.ExpandWidth(false)))
+                        {
+                            bool newState = ToggleBoolState(ref allReplace);
+                            for (int i = 0; i < currentOptInfo.Count; i++)
+                                currentOptInfo[i].isReplacing = newState;
+                        }
 
-                        using (new BGColoredScope(allActive, Color.grey, Color.green, ColorOrange))
-                            if (GUILayout.Button(new GUIContent("All Active", "Will be used during generation"), GUILayout.ExpandWidth(false)))
-                            {
-                                bool newState = ToggleBoolState(ref allActive);
-                                for (int i = 0; i < currentOptInfo.Count; i++)
-                                    currentOptInfo[i].isActive = newState;
-                            }
-                    }
+                    
+
 
                 }
                 DrawSeparator();
@@ -313,10 +316,28 @@ namespace DreadScripts.BlendTreeBulder
                             {
                                 using (new GUILayout.HorizontalScope())
                                 {
-                                    string fullName = $"{b.baseBranch.name} ({b.baseBranch.parameter}):";
-                                    b.foldout = EditorGUILayout.Foldout(b.foldout, fullName);
+                                    using (new IsolatedDisableScope(false))
+                                    {
+                                        EditorGUI.BeginChangeCheck();
+                                        b.isActive = EditorGUILayout.Toggle(b.isActive, GUILayout.Width(12), GUILayout.Height(18));
+                                        if (EditorGUI.EndChangeCheck())
+                                        {
+                                            b.foldout = false;
+                                            allActive = GetBoolState(currentOptInfo.optBranches.Select(branch => branch.isActive));
+                                        }
+                                    }
+                                    string paramLabel = string.IsNullOrEmpty(b.baseBranch.parameter) ? "No Parameter" : b.baseBranch.parameter;
+
+                                    GUIContent foldIcon = b.foldout ? Content.foldoutIconOn : Content.foldoutIconOff;
+                                    if (GUILayout.Button(foldIcon, Styles.iconButton, GUILayout.Width(15), GUILayout.Height(18)))
+                                        b.foldout = !b.foldout;
+                                    GUILayout.Label(b.baseBranch.name, Styles.foldoutLabel);
+                                    GUILayout.Label($"({b.linkedLayerIndex})", Styles.faintLabel);
+                                    GUILayout.Label($"[{paramLabel}]", Styles.italicFaintLabel);
+                                    //b.foldout = EditorGUILayout.Foldout(b.foldout, fullName);
                                     
                                     GUILayout.FlexibleSpace();
+                                    GUILayout.Label(b.displayType, Styles.typeLabel);
                                     using (new IsolatedDisableScope(false))
                                     {
                                         if (!string.IsNullOrEmpty(b.warnLog)) GUILayout.Label(new GUIContent(Content.warnIcon){tooltip = b.warnLog}, Styles.iconButton, GUILayout.Width(18), GUILayout.Height(18));
@@ -324,31 +345,54 @@ namespace DreadScripts.BlendTreeBulder
                                     }
 
                                     using (new BGColoredScope(b.isReplacing, Color.green, Color.grey))
-                                        if (GUILayout.Button(new GUIContent("Replace", "Will remove the linked animator layer on apply")))
+                                        if (GUILayout.Button(new GUIContent("Replace Layer", "Will remove the optimized animator layer on apply.")))
                                         {
                                             b.isReplacing = !b.isReplacing;
                                             allReplace = GetBoolState(currentOptInfo.optBranches.Select(branch => branch.isReplacing));
                                         }
 
-                                    using (new IsolatedDisableScope(false))
+                                    /*using (new IsolatedDisableScope(false))
                                     using (new BGColoredScope(b.isActive, Color.green, Color.grey))
                                         if (GUILayout.Button(new GUIContent("Active", "Will be used during generation")))
                                         {
                                             b.isActive = !b.isActive;
                                             b.foldout = false;
                                             allActive = GetBoolState(currentOptInfo.optBranches.Select(branch => branch.isActive));
-                                        }
+                                        }*/
                                 }
 
                                 if (!b.foldout) continue;
-                                using (new GUILayout.HorizontalScope())
-                                {
-                                    b.baseBranch.startMotion.QuickField(GUIContent.none);
-                                    DoPlaceholderLabel("Off", 40, 24);
+                                var targetChildren = b.baseBranch.childMotions;
+                                EditorGUI.BeginChangeCheck();
 
-                                    b.baseBranch.endMotion.QuickField(GUIContent.none);
-                                    DoPlaceholderLabel("On", 40, 24);
-                                }
+                                using (new EditorGUI.DisabledScope(!b.canEdit))
+                                    switch (targetChildren.Length)
+                                    {
+                                        case 1:
+                                            targetChildren[0].motion.QuickField(GUIContent.none);
+                                            DoPlaceholderLabel("Motion", 40, 24);
+                                            break;
+                                        case 2:
+                                            using (new GUILayout.HorizontalScope())
+                                            {
+                                                targetChildren[0].motion.QuickField(GUIContent.none);
+                                                DoPlaceholderLabel("Off", 40, 24);
+
+                                                targetChildren[0].motion.QuickField(GUIContent.none);
+                                                DoPlaceholderLabel("On", 40, 24);
+                                            }
+                                            break;
+                                        default:
+                                            for (int j = 0; j < targetChildren.Length; j++)
+                                            {
+                                                targetChildren[j].motion.QuickField(GUIContent.none);
+                                                DoPlaceholderLabel($"Motion {j + 1}", 100, 24);
+                                            }
+                                            break;
+                                    }
+
+                                if (EditorGUI.EndChangeCheck())
+                                    b.baseBranch.childMotions = targetChildren;
 
                             }
                         }
@@ -360,14 +404,14 @@ namespace DreadScripts.BlendTreeBulder
                             DrawBackButton();
                             using (new EditorGUI.DisabledScope(currentOptInfo.optBranches.TrueForAll(b => !b.isActive)))
                             using (new BGColoredScope(Color.green))
-                                if (GUILayout.Button("Optimize!"))
+                                if (GUILayout.Button("Optimize!", Styles.comicallyLargeButton))
                                 {
                                     if (makeDuplicate) Duplicate(fxController).name += " (Backup)";
                                     ApplyOptimization(currentOptInfo);
                                     currentOptInfo = GetOptimizationInfo(fxController);
                                 }
 
-                            if (GUILayout.Button("Refresh", GUILayout.ExpandWidth(false)))
+                            if (GUILayout.Button("Refresh", Styles.comicallyLargeButton, GUILayout.ExpandWidth(false)))
                                 currentOptInfo = GetOptimizationInfo(fxController);
                         }
 
@@ -387,12 +431,13 @@ namespace DreadScripts.BlendTreeBulder
                 using (new BGColoredScope(nextCondition, Color.green, Color.grey))
                     if (GUILayout.Button("Next"))
                         currentStep++;
+                    
             }
         }
 
         private static void DrawBackButton()
         {
-            if (GUILayout.Button(Content.backIcon, Styles.backButton, GUILayout.Width(18), GUILayout.Height(EditorGUIUtility.singleLineHeight)))
+            if (GUILayout.Button(Content.backIcon, Styles.iconButton, GUILayout.Width(18), GUILayout.Height(EditorGUIUtility.singleLineHeight)))
                 currentStep--;
 
         }

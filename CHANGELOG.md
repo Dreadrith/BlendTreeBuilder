@@ -1,3 +1,13 @@
+(v0.7.0)
+--------
+- [Feature] Can now handle layers with exclusive toggles
+- [Feature] Can now handle states with motion time
+- [Feature] Can now handle layers with a single state
+- [Feature/Fix] Added automatic fix of Unity's stupid native bug where, in DBTs, the total length of all clips lengths added together is the length of all clips.
+- [UI] Added layer index to optimization window
+- [UI] Other changes to make it clearer and cleaner
+- [Change] Warnings will now also disable the optimizable layers by default
+
 (v0.5.2)
 --------
 - [Fix] Fix incorrect error warning for missing parameter

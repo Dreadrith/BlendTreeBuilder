@@ -12,25 +12,26 @@ namespace DreadScripts.BlendTreeBulder
     {
         public string name;
         public string parameter;
-
-        public Motion startMotion;
-        public float startSpeed;
-
-        public Motion endMotion;
-        public float endSpeed;
-
-        public BlendTree linkedTree;
+        public ChildMotion[] childMotions;
+        
+        
+        //For the builder: Allow editing the tree directly through the tool window
+        //public BlendTree linkedTree;
     }
 
     public class OptimizeBranch
     {
         public Branch baseBranch;
         public AnimatorControllerLayer linkedLayer;
+        public int linkedLayerIndex;
         public bool isActive = true;
         public bool isReplacing = true;
+        public bool canEdit = true;
         public bool foldout;
         public string warnLog;
         public string errorLog;
+        public string displayType;
+        public bool isMotionTimed;
 
         public OptimizeBranch(Branch branch)
         {
@@ -48,148 +49,199 @@ namespace DreadScripts.BlendTreeBulder
             StringBuilder warnReport = new StringBuilder();
             StringBuilder errorReport = new StringBuilder();
 
+            //This switch check doesn't handle layers with no states in root statemachine properly
+            //I.E: When states are in sub-statemachines
+            //But why do that for a simple layer like these
             switch (layer.stateMachine.states.Length)
             {
                 case 0: return false;
                 case 1:
-                    //Check and handle layers with only one state with motion time OR just a regular blendtree
-                    //Fail if no motion. If motion is blendtree, branch is just a childmotion with this blendtree.
-                    //Split clip to many generated clips, one per frame. Where to save them? Dunno, Assets like the others?
-                    //End leaf tree is 1D tree with the parameter of motion time
-                    //Generated clips are set as child motions with their normalized time on og clip as their threshold
-                    //This has the side-effect of forcing all blending to be linear, which is the usual anyway.
-                    return false;
-                default:
+                {
+                    var state = layer.stateMachine.defaultState;
+                    if (!state.motion) return false;
+
+                    bool hasAnyTransition = false;
+                    bool success = true;
+                    layer.stateMachine.Iteratetransitions(t =>
                     {
-                        AnimatorState startState = null;
-                        float startSpeed = 0;
-                        AnimatorState endState = null;
-                        float endSpeed = 0;
+                        hasAnyTransition = true;
+                        return !(success = !t.destinationStateMachine && (!t.destinationState || t.destinationState == state));
+                    });
+                    if (!success) return false;
 
-                        bool success = false;
+                    if (hasAnyTransition) errorReport.AppendLine("\n- Layer contains transitions from and/or to the only state.");
+                    if (!state.timeParameterActive)
+                    {
+                        Branch baseBranch = new Branch() {name = controller.layers[layerIndex].name, childMotions = new ChildMotion[] {new ChildMotion() {motion = state.motion}}};
+                        optBranch = new OptimizeBranch(baseBranch) {linkedLayer = layer, linkedLayerIndex = layerIndex, displayType = "Single State"};
+                        return true;
+                    }
 
-                        // ReSharper disable once ConditionIsAlwaysTrueOrFalse
-                        //This is needed to set success to false and have cleaner code
-                        bool Failure() => !(success = false);
-                        bool foundBehaviours = false;
+                    if (state.motion is AnimationClip)
+                    {
+                        Branch baseBranch = new Branch() {name = controller.layers[layerIndex].name, parameter = state.timeParameter, childMotions = new ChildMotion[] {new ChildMotion() {motion = state.motion}}};
+                        optBranch = new OptimizeBranch(baseBranch) {linkedLayer = layer, linkedLayerIndex = layerIndex, displayType = "Motion Time State", isMotionTimed = true, canEdit = false};
+                        return true;
+                    }
 
-                        //Iteration stops when anything returns true
-                        layer.stateMachine.Iteratetransitions(t =>
+                    return false;
+                }
+                default:
+                {
+                    //Remake this to be more dynamic
+                    //Allowing it to handle exclusive toggles
+                    //I.E: rather than only 2 states, allow checking for as many states as there are, as long as the parameter and destination rules match
+
+
+                    HashSet<AnimatorState> visitedStates = new HashSet<AnimatorState>();
+                    Dictionary<float, AnimatorState> endStates = new Dictionary<float, AnimatorState>();
+
+                    bool success = false;
+
+                    bool Failure() => !(success = false);
+                    bool foundBehaviours = false;
+                    bool foundLoopingZeroSpeed = false;
+
+                    layer.stateMachine.Iteratetransitions(t =>
+                    {
+                        if (t.mute) return false;
+                        if (t.destinationStateMachine) return Failure();
+                        if (!t.conditions.Any()) return Failure();
+                        if (builtinParameters.Contains(t.conditions[0].parameter)) return Failure();
+
+                        for (int i = 1; i < t.conditions.Length; i++)
                         {
-                            if (t.destinationStateMachine) return Failure();
-                            if (!t.conditions.Any()) return Failure();
-                            if (builtinParameters.Contains(t.conditions[0].parameter)) return Failure();
+                            if (!Regex.Match(t.conditions[i].parameter, @"^(?i)isloaded").Success && !Regex.Match(t.conditions[i].parameter, @"^(?i)hasloaded").Success)
+                                return Failure();
+                        }
 
-                            for (int i = 1; i < t.conditions.Length; i++)
+
+                        if (t.destinationState)
+                        {
+                            var c = t.conditions[0];
+                            if (!string.IsNullOrEmpty(parameter) && parameter != c.parameter) return Failure();
+                            parameter = c.parameter;
+
+
+                            float standardizedThreshold = c.threshold;
+                            var dState = t.destinationState;
+
+                            switch (c.mode)
                             {
-                                if (!Regex.Match(t.conditions[i].parameter, @"^(?i)isloaded").Success && !Regex.Match(t.conditions[i].parameter, @"^(?i)hasloaded").Success)
+                                case AnimatorConditionMode.NotEqual: return Failure();
+                                case AnimatorConditionMode.IfNot:
+                                    standardizedThreshold = 0;
+                                    break;
+                                case AnimatorConditionMode.If:
+                                    standardizedThreshold = 1;
+                                    break;
+                                case AnimatorConditionMode.Less:
+                                case AnimatorConditionMode.Greater:
+                                    warnReport.AppendLine("\n- Parameter conditions are not exact. Less & Greater conditions are not handled accurately yet.");
+                                    break;
+                            }
+
+                            if (endStates.TryGetValue(standardizedThreshold, out AnimatorState endState))
+                            {
+                                if (endState != dState)
                                     return Failure();
                             }
-
-
-                            if (t.destinationState)
+                            else
                             {
-                                var c = t.conditions[0];
-                                if (!string.IsNullOrEmpty(parameter) && parameter != c.parameter) return Failure();
-                                parameter = c.parameter;
-
-
-                                bool standardizedCondition = false;
-                                
-                                switch (c.mode)
+                                if (visitedStates.Contains(dState)) return Failure();
+                                endStates.Add(standardizedThreshold, dState);
+                                if (!foundLoopingZeroSpeed && dState.speed == 0 && dState.motion && dState.motion.isLooping)
                                 {
-                                    case AnimatorConditionMode.If: standardizedCondition = true; break;
-                                    case AnimatorConditionMode.Equals when c.threshold == 1:
-                                    case AnimatorConditionMode.Greater when c.threshold > Mathf.Epsilon:
-                                        standardizedCondition = true;
-                                        warnReport.AppendLine("\n- Parameter is not a bool. Conditions has been standardized to true/false which may not reflect the behaviour accurately.");
-                                        break;
+                                    foundLoopingZeroSpeed = true;
+                                    warnReport.AppendLine("\n- Layer contains a looping motion on a state with 0 speed. Blendtrees can't have 0 speed so speed is set to -1 which may be undesirable on a looping animation.");
                                 }
+                            }
+                           
 
-                                if (standardizedCondition)
-                                {
-                                    if (endState != null && endState != t.destinationState) return Failure();
-                                    endState = t.destinationState;
-                                    endSpeed = t.destinationState.speed;
-                                    if (endSpeed == 0) endSpeed = -1;
-                                }
-                                else
-                                {
-                                    if (startState != null && startState != t.destinationState) return Failure();
-                                    startState = t.destinationState;
-                                    startSpeed = t.destinationState.speed;
-                                    if (startSpeed == 0) startSpeed = -1;
-                                }
-
-                                if (!foundBehaviours && t.destinationState.behaviours != null && t.destinationState.behaviours.Length > 0)
-                                {
-                                    foundBehaviours = true;
-                                    errorReport.AppendLine("\n- Layer contains statemachine behaviours, which may be necessary for certain functionality, such as Exclusive Toggles.");
-                                }
-
+                            if (!foundBehaviours && t.destinationState.behaviours != null && t.destinationState.behaviours.Length > 0)
+                            {
+                                foundBehaviours = true;
+                                errorReport.AppendLine("\n- Layer contains statemachine behaviours, which may be necessary for certain functionality, such as Exclusive Toggles.");
                             }
 
-                            if (!mayChangeBehaviour && t is AnimatorStateTransition t2 && ((t2.hasExitTime && t2.exitTime > 0) || t2.duration > 0 || t2.offset > 0))
-                                mayChangeBehaviour = true;
+                        }
+
+                        if (!mayChangeBehaviour && t is AnimatorStateTransition t2 && ((t2.hasExitTime && t2.exitTime > 0) || t2.duration > 0 || t2.offset > 0))
+                            mayChangeBehaviour = true;
 
 
-                            if (!success && !string.IsNullOrEmpty(parameter) && startState && endState) success = true;
+                        if (!success && !string.IsNullOrEmpty(parameter) && endStates.Count >= 2) success = true;
 
-                            return false;
-                        });
-                        if (!success) return false;
+                        return false;
+                    });
+                    if (!success) return false;
 
-                        AnimatorControllerParameter animParameter = controller.parameters.FirstOrDefault(p => p.name == parameter);
-                        if (animParameter != null)
+                    AnimatorControllerParameter animParameter = controller.parameters.FirstOrDefault(p => p.name == parameter);
+                    if (animParameter != null)
+                    {
+                        if (animParameter.type != AnimatorControllerParameterType.Float)
                         {
-                            if( animParameter.type != AnimatorControllerParameterType.Float)
+                            bool wasReused = false;
+                            foreach (var layer2 in controller.layers)
                             {
-                                bool wasReused = false;
-                                foreach (var layer2 in controller.layers)
+                                if (layer2.stateMachine == layer.stateMachine) continue;
+
+                                bool parameterReused = false;
+                                layer2.stateMachine.Iteratetransitions(t => parameterReused = t.conditions.Any(c => c.parameter == parameter));
+
+                                if (!parameterReused) continue;
+                                if (!wasReused)
                                 {
-                                    if (layer2.stateMachine == layer.stateMachine) continue;
-
-                                    bool parameterReused = false;
-                                    layer2.stateMachine.Iteratetransitions(t => parameterReused = t.conditions.Any(c => c.parameter == parameter));
-
-                                    if (!parameterReused) continue;
-                                    if (!wasReused)
-                                    {
-                                        wasReused = true;
-                                        errorReport.Append("\n- Non-Float Parameter is reused in other layers: ");
-                                    }
-
-                                    errorReport.Append($"[{layer2.name}]");
+                                    wasReused = true;
+                                    errorReport.Append("\n- Non-Float Parameter is reused in other layers: ");
                                 }
+
+                                errorReport.Append($"[{layer2.name}]");
                             }
                         }
-                        else errorReport.AppendLine($"\nParameter {parameter} not found in the controller!");
-                        
-
-                        var baseBranch = new Branch()
-                        {
-                            name = name, 
-                            parameter = parameter, 
-                            startMotion = startState.motion, 
-                            endMotion = endState.motion, 
-                            startSpeed = startSpeed, 
-                            endSpeed = endSpeed
-                        };
-
-                        string warnLog = warnReport.ToString();
-                        if (!string.IsNullOrEmpty(warnLog)) warnLog = ("Toggle behaviour may be different due to the following reasons:\n" + warnLog).Trim();
-
-                        string errorLog = errorReport.ToString();
-                        if (!string.IsNullOrEmpty(errorLog)) errorLog = ("Some stuff may break for these reasons:\n" + errorLog).Trim();
-
-                        optBranch = new OptimizeBranch(baseBranch) { linkedLayer = layer, isActive = string.IsNullOrEmpty(errorLog), warnLog = warnLog, errorLog = errorLog};
-                        return true;
-
                     }
+                    else errorReport.AppendLine($"\n- Parameter {parameter} not found in the controller!");
+
+                    if (endStates.Values.Any(s => s.motion && s.motion.isLooping && !IsConstant(s.motion)))
+                        warnReport.AppendLine("\n- Animation Clips used are not constant! Blendtrees usually will be playing the end of the clips");
+
+
+                    var newChildren = new ChildMotion[endStates.Count];
+                    int currentIndex = 0;
+                    foreach (var (threshold, state) in endStates)
+                    {
+                        newChildren[currentIndex++] = new ChildMotion()
+                        {
+                            motion = state.motion,
+                            timeScale = state.speed,
+                            threshold = threshold != 0 ? threshold : -1 
+                        };
+                    }
+
+
+                    var baseBranch = new Branch()
+                    {
+                        name = name,
+                        parameter = parameter,
+                        childMotions = newChildren
+                    };
+
+
+                    string warnLog = warnReport.ToString();
+                    if (!string.IsNullOrEmpty(warnLog)) warnLog = ("Toggle behaviour may be different due to the following reasons:\n" + warnLog).Trim();
+
+                    string errorLog = errorReport.ToString();
+                    if (!string.IsNullOrEmpty(errorLog)) errorLog = ("Some stuff may break for these reasons:\n" + errorLog).Trim();
+
+                    var active = string.IsNullOrEmpty(errorLog) && string.IsNullOrEmpty(warnLog);
+                    optBranch = new OptimizeBranch(baseBranch) {linkedLayer = layer, linkedLayerIndex = layerIndex, displayType = endStates.Count == 2 ? "Toggle" : "Exclusive Toggle", isActive = active, warnLog = warnLog, errorLog = errorLog};
+
+                    return true;
+
+                }
             }
 
         }
-
 
         public static implicit operator Branch(OptimizeBranch b) => b.baseBranch;
     }

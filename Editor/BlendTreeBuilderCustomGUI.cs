@@ -77,20 +77,30 @@ namespace DreadScripts.BlendTreeBulder
 
         public static class Styles
         {
-            public  static readonly GUIStyle faintLabel
+            public static readonly GUIStyle faintLabel
                 = new GUIStyle(GUI.skin.label)
                 {
-                    fontStyle = FontStyle.Italic,
                     fontSize = 11,
+                    contentOffset = new Vector2(-2.5f, 1.5f),
+                    normal = { textColor = EditorGUIUtility.isProSkin ? Color.gray : new Color(0.357f, 0.357f, 0.357f) }
+                };
+
+            public static readonly GUIStyle italicFaintLabel
+                = new GUIStyle(faintLabel)
+                {
+                    fontStyle = FontStyle.Italic,
                 };
 
             public static readonly GUIStyle placeHolderLabel
-                = new GUIStyle(faintLabel)
+                = new GUIStyle(italicFaintLabel)
                 {
                     alignment = TextAnchor.MiddleRight,
                     contentOffset = new Vector2(-2.5f, 0),
-                    normal = { textColor = EditorGUIUtility.isProSkin ? Color.gray : new Color(0.357f, 0.357f, 0.357f) }
                 };
+
+            public static readonly GUIStyle typeLabel
+                = new GUIStyle(italicFaintLabel)
+                { alignment = TextAnchor.MiddleRight};
 
             public static readonly GUIStyle centeredLabel = new GUIStyle(EditorStyles.largeLabel)
             {
@@ -106,12 +116,15 @@ namespace DreadScripts.BlendTreeBulder
                 {
                     padding = new RectOffset(1, 1, 1, 1),
                     margin = new RectOffset(),
-                    alignment = TextAnchor.MiddleCenter
+                    alignment = TextAnchor.MiddleCenter,
+                    contentOffset = new Vector2(0, 2)
                 };
 
-            public static readonly GUIStyle backButton = new GUIStyle(iconButton)
+            public static readonly GUIStyle foldoutLabel = new GUIStyle(GUI.skin.label)
             {
-                contentOffset = new Vector2(0, 2),
+                padding = new RectOffset(1, 1, 1, 1),
+                margin = new RectOffset(),
+                contentOffset = new Vector2(0, 2)
             };
 
             public static readonly GUIStyle comicallyLargeButton = new GUIStyle(GUI.skin.button)
@@ -128,6 +141,8 @@ namespace DreadScripts.BlendTreeBulder
             public static readonly GUIContent backIcon = EditorGUIUtility.IconContent("back");
             public static readonly GUIContent warnIcon = new GUIContent(EditorGUIUtility.IconContent("console.warnicon.sml")){tooltip = "Transitions are not instant. This may change the behaviour of the toggle."};
             public static readonly GUIContent errorIcon = EditorGUIUtility.IconContent("CollabError");
+            public static readonly GUIContent foldoutIconOff = EditorGUIUtility.IconContent("IN foldout");
+            public static readonly GUIContent foldoutIconOn = EditorGUIUtility.IconContent("IN foldout on");
         }
 
         public static void DrawSeparator(int thickness = 2, int padding = 10)
