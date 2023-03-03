@@ -35,7 +35,7 @@ namespace DreadScripts.BlendTreeBulder
             {
                 if (cm.motion is AnimationClip clip)
                 {
-                    var l = clip.length / cm.timeScale;
+                    var l = Mathf.Abs(clip.length / cm.timeScale);
                     if (l > maxLength)
                         maxLength = l;
                 }
@@ -66,7 +66,7 @@ namespace DreadScripts.BlendTreeBulder
             tree.IterateTreeChildren(cm =>
             {
                 if (cm.motion is AnimationClip clip)
-                    lengths.Add(clip.length / cm.timeScale);
+                    lengths.Add(Mathf.Abs(clip.length / cm.timeScale));
                 else if (cm.motion is BlendTree subTree)
                 {
                     if (subTree.blendType == BlendTreeType.Direct)
@@ -84,14 +84,14 @@ namespace DreadScripts.BlendTreeBulder
             tree.IterateTreeChildren(cm =>
             {
                 if (cm.motion is AnimationClip)
-                    cm.timeScale = (float)newSpeeds[index++];
+                    cm.timeScale = (float)newSpeeds[index++] * (cm.timeScale < 0 ? -1 : 1);
                 else if (cm.motion is BlendTree subTree)
                     MultiplyTreeSpeed(subTree, (float) newSpeeds[index++]);
                 
                 return cm;
             }, false, undo);
 
-            return lengths.Any() ? lengths.Max() : 0;
+            return lengths.Any() ? lengths.Sum() : 0;
         }
 
         //Big thanks and credit to jellejurre#8585
@@ -99,12 +99,14 @@ namespace DreadScripts.BlendTreeBulder
         public static double[] GetSpeeds(double[] lengths)
         {
             double[] speeds = Enumerable.Repeat(1.0, lengths.Length).ToArray();
+            
             double[] newSpeeds = Iterate(speeds, lengths);
             while (GetError(speeds, newSpeeds) > 0.0000001)
             {
                 speeds = newSpeeds;
                 newSpeeds = Iterate(speeds, lengths);
             }
+
             return newSpeeds;
         }
 
@@ -114,11 +116,13 @@ namespace DreadScripts.BlendTreeBulder
             for (int i = 0; i < speeds.Length; i++)
             {
                 double currentSpeed = 0;
+
                 for (int j = 0; j < speeds.Length; j++)
                 {
                     if (i > j)
                     {
-                        currentSpeed += lengths[j] / newSpeeds[j] / lengths[i];
+                        if (newSpeeds[j] != 0 && lengths[i] != 0)
+                            currentSpeed += lengths[j] / newSpeeds[j] / lengths[i];
                     }
                     if (i == j)
                     {
@@ -126,9 +130,11 @@ namespace DreadScripts.BlendTreeBulder
                     }
                     if (i < j)
                     {
-                        currentSpeed += lengths[j] / speeds[j] / lengths[i];
+                        if (speeds[j] != 0 && lengths[i] != 0)
+                            currentSpeed += lengths[j] / speeds[j] / lengths[i];
                     }
                 }
+
                 newSpeeds[i] = currentSpeed;
             }
             return newSpeeds;

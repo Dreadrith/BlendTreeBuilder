@@ -51,6 +51,7 @@ namespace DreadScripts.BlendTreeBulder
             set
             {
                 _currentOptInfo = value;
+                if (_currentOptInfo == null) return;
                 allReplace = GetBoolState(_currentOptInfo.optBranches.Select(b => b.isReplacing));
                 allActive = GetBoolState(_currentOptInfo.optBranches.Select(b => b.isActive));
             }
