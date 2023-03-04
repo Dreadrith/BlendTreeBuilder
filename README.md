@@ -2,8 +2,11 @@
 
 ### A Unity tool to make VRC Blendtree creation easier and faster
 
-Currently, this tool is only capable of handling toggle layers for the most part.  
 It is not perfect by any means but will hopefully prove useful in optimizing your toggles.
+Currently can handle:
+- Simple toggles
+- Single State layers, including motion time states.
+- Exclusive Toggles
 
 # Installation
 1. Download the Unity package from [releases.](https://github.com/Dreadrith/BlendTreeBuilder/releases)
@@ -38,9 +41,8 @@ If something doesn't work, you can go back to optimize the original again and di
 The optimizer does not take into account layer priority. If an optimized toggle has overlapping clips with another clip, there may be change in behaviour where properties get overwritten.
 
 ## Planned Features
-- Handle dedicated motion time layers
-- Handle dedicated single blendtree layers
-- Implement float smoothing for clip blending
+- UPM & VPM support
+- Implement float smoothing for clip blending. i.e: dissolves
 - Make the builder for faster and easier tree building
 - Optimize my smooth brain
 
