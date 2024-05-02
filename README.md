@@ -1,16 +1,12 @@
 # BlendTreeBuilder
+A Unity tool to make VRC Blendtree creation easier and faster 
 
-### A Unity tool to make VRC Blendtree creation easier and faster
+### [Download From Here](https://vpm.dreadscripts.com/)
 
-It is not perfect by any means but will hopefully prove useful in optimizing your toggles.
-Currently can handle:
+## Features
 - Simple toggles
 - Single State layers, including motion time states.
 - Exclusive Toggles
-
-# Installation
-1. Download the Unity package from [releases.](https://github.com/Dreadrith/BlendTreeBuilder/releases)
-2. Import the Unity package into Unity.
 
 # How to use
 1. Open the window by finding it in the toolbar: DreadTools > BlendTreeBuilder
@@ -18,7 +14,7 @@ Currently can handle:
 3. Press 'Optimize!' at the bottom.
 4. Done!
 
-![ready window](https://github.com/Dreadrith/BlendTreeBuilder/raw/main/media~/wind1.png)
+![ready window](https://i.imgur.com/aGnwx2T.png)
 
 # Details
 On the second step, in the optimize tab, you're given details on what will be handled.
@@ -29,7 +25,7 @@ On the second step, in the optimize tab, you're given details on what will be ha
 - Red warning icon appears if optimizing this toggle may break some functionality, such as with exclusive toggles through parameter drivers.
 - Foldout is to see or change what start and end motions will be used for this toggle.
 
-![optimize window](https://github.com/Dreadrith/BlendTreeBuilder/raw/main/media~/wind2.png)
+![optimize window](https://i.imgur.com/QIDZTdq.png)
 
 ### Notes
 You should almost always make backups in case something doesn't work right.  
@@ -41,9 +37,10 @@ If something doesn't work, you can go back to optimize the original again and di
 The optimizer does not take into account layer priority. If an optimized toggle has overlapping clips with another clip, there may be change in behaviour where properties get overwritten.
 
 ## Planned Features
-- UPM & VPM support
 - Implement float smoothing for clip blending. i.e: dissolves
 - Make the builder for faster and easier tree building
-- Optimize my smooth brain
 
-![tree preview](https://github.com/Dreadrith/BlendTreeBuilder/raw/main/media~/wind3.png)
+![tree preview](https://i.imgur.com/M0L2E8G.png)
+
+### Thank You
+If you enjoy BlendTreeBuilder, please consider [supporting me ♡](https://ko-fi.com/Dreadrith)!

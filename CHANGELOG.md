@@ -1,3 +1,7 @@
+(v0.8.0)
+--------
+- [Improvement] Migrated to VPM Format
+
 (v0.7.0)
 --------
 - [Feature] Can now handle layers with exclusive toggles
