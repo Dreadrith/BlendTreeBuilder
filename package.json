@@ -1,0 +1,16 @@
+{
+  "name": "com.dreadscripts.blendtreebuilder",
+  "displayName": "DreadScripts - BlendTreeBuilder",
+  "version": "0.8.0",
+  "description": "A Unity tool to make VRC Blendtree creation easier and faster.",
+  "gitDependencies": {},
+  "vpmDependencies": {},
+  "author": {
+    "name": "Dreadrith",
+    "email": "dreadscripts@gmail.com",
+    "url": "https://www.dreadrith.com"
+  },
+  "legacyFolders": {},
+  "legacyFiles": {},
+  "type": "tool"
+}
