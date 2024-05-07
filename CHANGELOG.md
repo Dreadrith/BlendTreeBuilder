@@ -1,3 +1,8 @@
+(v0.8.1)
+--------
+- [Fix] Added assembly definition which allows the package to actually compile
+- [Misc] Defined minimal unity version
+
 (v0.8.0)
 --------
 - [Improvement] Migrated to VPM Format
