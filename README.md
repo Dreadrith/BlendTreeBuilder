@@ -29,8 +29,7 @@ On the second step, in the optimize tab, you're given details on what will be ha
 
 ### Notes
 You should almost always make backups in case something doesn't work right.  
-After running the tool, you should test whether they work with [this emulator](https://github.com/jellejurre/Av3Emulator/tree/add-parameter-mismatch).  
-It's important to use the fork! The original does not support parameter mismatching yet.  
+After running the tool, you should test whether they work with [this emulator](https://github.com/lyuma/Av3Emulator).  
 If something doesn't work, you can go back to optimize the original again and disable 'Active' for the toggles that didn't work.
 
 ### Warning
