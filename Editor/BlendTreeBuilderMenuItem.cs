@@ -1,13 +1,11 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.Animations;
-using System.Linq;
-using static DreadScripts.BlendTreeBulder.BlendTreeBuilderHelper;
+using UnityEngine;
 
-namespace DreadScripts.BlendTreeBulder
+namespace Editor
 {
     public class BlendTreeBuilderMenuItem : EditorWindow
     {
@@ -33,17 +31,22 @@ namespace DreadScripts.BlendTreeBulder
             double maxLength = 0;
             tree.IterateTreeChildren(cm =>
             {
-                if (cm.motion is AnimationClip clip)
+                switch (cm.motion)
                 {
-                    var l = Mathf.Abs(clip.length / cm.timeScale);
-                    if (l > maxLength)
-                        maxLength = l;
-                }
-                else if (cm.motion is BlendTree subtree)
-                {
-                    var l = subtree.blendType == BlendTreeType.Direct ? FixTreeSpeed(subtree) : GetTreeLength(subtree);
-                    if (l > maxLength)
-                        maxLength = l;
+                    case AnimationClip clip:
+                    {
+                        var l = Mathf.Abs(clip.length / cm.timeScale);
+                        if (l > maxLength)
+                            maxLength = l;
+                        break;
+                    }
+                    case BlendTree subtree:
+                    {
+                        var l = subtree.blendType == BlendTreeType.Direct ? FixTreeSpeed(subtree) : GetTreeLength(subtree);
+                        if (l > maxLength)
+                            maxLength = l;
+                        break;
+                    }
                 }
 
                 return cm;
@@ -62,32 +65,41 @@ namespace DreadScripts.BlendTreeBulder
 
         public static double FixTreeSpeed(BlendTree tree, bool undo = true)
         {
-            List<double> lengths = new List<double>();
+            var lengths = new List<double>();
             tree.IterateTreeChildren(cm =>
             {
-                if (cm.motion is AnimationClip clip)
-                    lengths.Add(Mathf.Abs(clip.length / cm.timeScale));
-                else if (cm.motion is BlendTree subTree)
+                switch (cm.motion)
                 {
-                    if (subTree.blendType == BlendTreeType.Direct)
+                    case AnimationClip clip:
+                        lengths.Add(Mathf.Abs(clip.length / cm.timeScale));
+                        break;
+                    case BlendTree { blendType: BlendTreeType.Direct } subTree:
                         lengths.Add(FixTreeSpeed(subTree));
-                    else lengths.Add(GetTreeLength(subTree));
+                        break;
+                    case BlendTree subTree:
+                        lengths.Add(GetTreeLength(subTree));
+                        break;
                 }
-                
+
                 return cm;
             }, false);
 
 
-            double[] newSpeeds = GetSpeeds(lengths.ToArray());
-            int index = 0;
+            var newSpeeds = GetSpeeds(lengths.ToArray());
+            var index = 0;
 
             tree.IterateTreeChildren(cm =>
             {
-                if (cm.motion is AnimationClip)
-                    cm.timeScale = (float)newSpeeds[index++] * (cm.timeScale < 0 ? -1 : 1);
-                else if (cm.motion is BlendTree subTree)
-                    MultiplyTreeSpeed(subTree, (float) newSpeeds[index++]);
-                
+                switch (cm.motion)
+                {
+                    case AnimationClip:
+                        cm.timeScale = (float)newSpeeds[index++] * (cm.timeScale < 0 ? -1 : 1);
+                        break;
+                    case BlendTree subTree:
+                        MultiplyTreeSpeed(subTree, (float) newSpeeds[index++]);
+                        break;
+                }
+
                 return cm;
             }, false, undo);
 
@@ -98,9 +110,9 @@ namespace DreadScripts.BlendTreeBulder
         #region Fix Tree Speed Math
         public static double[] GetSpeeds(double[] lengths)
         {
-            double[] speeds = Enumerable.Repeat(1.0, lengths.Length).ToArray();
+            var speeds = Enumerable.Repeat(1.0, lengths.Length).ToArray();
             
-            double[] newSpeeds = Iterate(speeds, lengths);
+            var newSpeeds = Iterate(speeds, lengths);
             while (GetError(speeds, newSpeeds) > 0.0000001)
             {
                 speeds = newSpeeds;
@@ -112,12 +124,12 @@ namespace DreadScripts.BlendTreeBulder
 
         public static double[] Iterate(double[] speeds, double[] lengths)
         {
-            double[] newSpeeds = new double[speeds.Length];
-            for (int i = 0; i < speeds.Length; i++)
+            var newSpeeds = new double[speeds.Length];
+            for (var i = 0; i < speeds.Length; i++)
             {
                 double currentSpeed = 0;
 
-                for (int j = 0; j < speeds.Length; j++)
+                for (var j = 0; j < speeds.Length; j++)
                 {
                     if (i > j)
                     {
@@ -128,11 +140,10 @@ namespace DreadScripts.BlendTreeBulder
                     {
                         currentSpeed += 1;
                     }
-                    if (i < j)
-                    {
-                        if (speeds[j] != 0 && lengths[i] != 0)
-                            currentSpeed += lengths[j] / speeds[j] / lengths[i];
-                    }
+
+                    if (i >= j) continue;
+                    if (speeds[j] != 0 && lengths[i] != 0)
+                        currentSpeed += lengths[j] / speeds[j] / lengths[i];
                 }
 
                 newSpeeds[i] = currentSpeed;
@@ -142,12 +153,7 @@ namespace DreadScripts.BlendTreeBulder
 
         public static double GetError(double[] a1, double[] a2)
         {
-            double error = 0;
-            for (int i = 0; i < a1.Length; i++)
-            {
-                error += Math.Abs(a1[i] - a2[i]);
-            }
-            return error;
+            return a1.Select((t, i) => Math.Abs(t - a2[i])).Sum();
         }
         #endregion
     }

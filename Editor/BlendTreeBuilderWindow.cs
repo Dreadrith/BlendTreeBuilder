@@ -1,70 +1,68 @@
 ﻿using System;
-using UnityEngine;
-using UnityEditor;
-using VRC.SDK3.Avatars.Components;
-using UnityEditor.Animations;
-using VRC.SDK3.Avatars.ScriptableObjects;
-using static DreadScripts.BlendTreeBulder.BlendTreeBuilderCustomGUI;
-using static DreadScripts.BlendTreeBulder.BlendTreeBuilderMain;
-using static DreadScripts.BlendTreeBulder.BlendTreeBuilderHelper;
 using System.Linq;
+using UnityEditor;
+using UnityEditor.Animations;
+using UnityEngine;
+using VRC.SDK3.Avatars.Components;
+using VRC.SDK3.Avatars.ScriptableObjects;
+using static Editor.BlendTreeBuilderCustomGUI;
+using static Editor.BlendTreeBuilderMain;
+using static Editor.BlendTreeBuilderHelper;
 
-namespace DreadScripts.BlendTreeBulder
+namespace Editor
 {
     public class BlendTreeBuilderWindow : EditorWindow
     {
         #region Constants
-        public const string GENERATED_ASSETS_PATH = "Assets/DreadScripts/BlendTreeBuilder/Generated Assets";
-        public const string PRIORITY_WARNING_PREFKEY = "BTBPriorityWarningRead";
+        public const string GeneratedAssetsPath = "Assets/DreadScripts/BlendTreeBuilder/Generated Assets";
+        public const string PriorityWarningPrefkey = "BTBPriorityWarningRead";
         #endregion
 
         #region Privates
-        private static readonly string[] toolbarOptions = { "Optimize", "Build" };
-        private static int toolbarIndex;
-        private static Vector2 scroll;
+        private static readonly string[] ToolbarOptions = { "Optimize", "Build" };
+        private static int _toolbarIndex;
+        private static Vector2 _scroll;
 
-        private static BlendTree masterBlendtree;
+        private static BlendTree _masterBlendtree;
         private static AnimatorController _fxController;
 
-        private static AnimatorController fxController
+        private static AnimatorController FXController
         {
             get => _fxController;
             set
             {
-                if (_fxController != value)
-                {
-                    _fxController = value;
-                    currentOptInfo = null;
-                }
+                if (_fxController == value) return;
+                _fxController = value;
+                CurrentOptInfo = null;
             }
         }
-        private static VRCExpressionParameters exParameters;
+        private static VRCExpressionParameters _exParameters;
         private static OptimizationInfo _currentOptInfo;
-        private static bool shouldRepaint;
-        private static int currentStep;
+        private static bool _shouldRepaint;
+        private static int _currentStep;
 
-        private static bool hasReadPriorityWarning;
+        private static bool _hasReadPriorityWarning;
 
-        private static OptimizationInfo currentOptInfo
+        private static OptimizationInfo CurrentOptInfo
         {
             get => _currentOptInfo;
             set
             {
                 _currentOptInfo = value;
                 if (_currentOptInfo == null) return;
-                allReplace = GetBoolState(_currentOptInfo.optBranches.Select(b => b.isReplacing));
-                allActive = GetBoolState(_currentOptInfo.optBranches.Select(b => b.isActive));
+                AllReplace = GetBoolState(_currentOptInfo.OptBranches.Select(b => b.IsReplacing));
+                AllActive = GetBoolState(_currentOptInfo.OptBranches.Select(b => b.IsActive));
             }
         }
         #endregion
 
         #region Input
-        public static bool makeDuplicate = true;
-        public static int allActive = 1;
-        public static int allReplace = 1;
+        public static bool MakeDuplicate = true;
+        public static int AllActive = 1;
+        public static int AllReplace = 1;
 
         private static VRCAvatarDescriptor _avatar;
-        public static VRCAvatarDescriptor avatar
+        public static VRCAvatarDescriptor Avatar
         {
             get => _avatar;
             set
@@ -81,8 +79,8 @@ namespace DreadScripts.BlendTreeBulder
 
         private void OnGUI()
         {
-            scroll = EditorGUILayout.BeginScrollView(scroll);
-            switch (currentStep)
+            _scroll = EditorGUILayout.BeginScrollView(_scroll);
+            switch (_currentStep)
             {
                 /*case 0: DrawAvatarSelectionStep(); break;
                 case 1: DrawAvatarReadyStep(); break;
@@ -95,33 +93,31 @@ namespace DreadScripts.BlendTreeBulder
 
             EditorGUILayout.EndScrollView();
 
-            if (shouldRepaint)
-            {
-                shouldRepaint = false;
-                Repaint();
-            }
+            if (!_shouldRepaint) return;
+            _shouldRepaint = false;
+            Repaint();
         }
 
         private void DrawAvatarSelectionStep()
         {
             using (new TitledScope("Select your Avatar"))
             {
-                var tempAvatar = avatar;
-                var fieldLabel = "Avatar";
+                var tempAvatar = Avatar;
+                const string fieldLabel = "Avatar";
 
                 EditorGUI.BeginChangeCheck();
 
-                if (avatar) DrawValidatedField("Avatar is Set!", ref tempAvatar, fieldLabel);
+                if (Avatar) DrawValidatedField("Avatar is Set!", ref tempAvatar, fieldLabel);
                 else {DrawWarningField("Please select your target Avatar", ref tempAvatar, fieldLabel, () =>
                 {
                     AutoDetectAvatar();
-                    tempAvatar = avatar;
+                    tempAvatar = Avatar;
                 }, "Auto-Detect"); }
 
                 if (EditorGUI.EndChangeCheck())
-                    avatar = tempAvatar;
+                    Avatar = tempAvatar;
                 
-                DrawNextButton(avatar);
+                DrawNextButton(Avatar);
             }
         }
 
@@ -157,21 +153,21 @@ namespace DreadScripts.BlendTreeBulder
 
         private void DrawMasterTreeReadyStep()
         {
-            ResetStepsIf(!avatar || !fxController, false);
+            ResetStepsIf(!Avatar || !FXController, false);
             using (new TitledScope("Master BlendTree Setup"))
             {
-                var fieldLabel = "Master BlendTree";
+                const string fieldLabel = "Master BlendTree";
 
-                if (masterBlendtree) DrawValidatedField("Master BlendTree is ready for use!", ref masterBlendtree, fieldLabel);
+                if (_masterBlendtree) DrawValidatedField("Master BlendTree is ready for use!", ref _masterBlendtree, fieldLabel);
                 else
                 {
                     DrawWarningField("Master BlendTree is not setup on the Controller.",
-                        ref masterBlendtree, fieldLabel,
-                        () => { masterBlendtree = GetOrGenerateMasterBlendTree(avatar); }, "Ready Master BlendTree");
+                        ref _masterBlendtree, fieldLabel,
+                        () => { _masterBlendtree = GetOrGenerateMasterBlendTree(Avatar); }, "Ready Master BlendTree");
                 }
 
 
-                DrawNextButton(masterBlendtree);
+                DrawNextButton(_masterBlendtree);
             }
         }
 
@@ -185,37 +181,37 @@ namespace DreadScripts.BlendTreeBulder
 
                 #region Avatar Ready
 
-                var tempAvatar = avatar;
+                var tempAvatar = Avatar;
 
                 EditorGUI.BeginChangeCheck();
 
-                if (avatar) DrawValidatedField("Avatar is Set!", ref tempAvatar, fieldLabel);
+                if (Avatar) DrawValidatedField("Avatar is Set!", ref tempAvatar, fieldLabel);
                 else
                 {
                     DrawWarningField("Please select your target Avatar", ref tempAvatar, fieldLabel, () =>
                     {
                         AutoDetectAvatar();
-                        tempAvatar = avatar;
+                        tempAvatar = Avatar;
                     }, "Auto-Detect");
                 }
 
                 if (EditorGUI.EndChangeCheck())
-                    avatar = tempAvatar;
+                    Avatar = tempAvatar;
 
                 #endregion
-                var tempController = fxController;
+                var tempController = FXController;
 
                 EditorGUI.BeginChangeCheck();
-                if (fxController) DrawValidatedField("Controller is ready for use!", ref tempController, fieldLabel2);
+                if (FXController) DrawValidatedField("Controller is ready for use!", ref tempController, fieldLabel2);
                 else
                 {
                     DrawWarningField("FX Controller is not setup on the Avatar",
-                        ref tempController, fieldLabel2, !avatar || true ? (Action)null : () => { fxController = avatar.ReadyPlayableLayer(VRCAvatarDescriptor.AnimLayerType.FX, GENERATED_ASSETS_PATH); },
+                        ref tempController, fieldLabel2, !Avatar || true ? (Action)null : () => { FXController = Avatar.ReadyPlayableLayer(VRCAvatarDescriptor.AnimLayerType.FX, GeneratedAssetsPath); },
                         "Ready FX");
                 }
 
                 if (EditorGUI.EndChangeCheck())
-                    fxController = tempController;
+                    FXController = tempController;
 
                 /*
                 if (exParameters) DrawValidatedField("Expression Parameters are ready for use!", ref exParameters, fieldLabel3);
@@ -227,54 +223,55 @@ namespace DreadScripts.BlendTreeBulder
                         "Ready ExParameters");
                 }*/
 
-                DrawNextButton(fxController);
+                DrawNextButton(FXController);
             }
 
         }
         private void DrawMainStep()
         {
-            toolbarIndex = GUILayout.Toolbar(toolbarIndex, toolbarOptions, EditorStyles.toolbarButton);
-            switch (toolbarIndex)
+            _toolbarIndex = GUILayout.Toolbar(_toolbarIndex, ToolbarOptions, EditorStyles.toolbarButton);
+            switch (_toolbarIndex)
             {
                 case 0:
                     DrawOptimizationWindow();
                     break;
                 case 1:
-                    using (new TitledScope(toolbarOptions[1]))
+                    using (new TitledScope(ToolbarOptions[1]))
                         EditorGUILayout.HelpBox("Under development!", MessageType.Info);
                     break;
             }
         }
 
-        private void DrawOptimizationWindow()
+        private static void DrawOptimizationWindow()
         {
-            ResetStepsIf(!fxController, false);
+            ResetStepsIf(!FXController, false);
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 using (new GUILayout.HorizontalScope())
                 {
-                    using (new BGColoredScope(allActive, Color.grey, Color.green, ColorOrange))
+                    using (new BgColoredScope(AllActive, Color.grey, Color.green, ColorOrange))
                         if (GUILayout.Button(new GUIContent("All Active", "Will be used during generation"), GUILayout.ExpandWidth(false)))
                         {
-                            bool newState = ToggleBoolState(ref allActive);
-                            for (int i = 0; i < currentOptInfo.Count; i++)
-                                currentOptInfo[i].isActive = newState;
+                            var newState = ToggleBoolState(ref AllActive);
+                            for (var i = 0; i < CurrentOptInfo.Count; i++)
+                                CurrentOptInfo[i].IsActive = newState;
                         }
 
                     GUILayout.Space(65);
-                    EditorGUILayout.LabelField("Optimize", Styles.titleLabel);
+                    EditorGUILayout.LabelField("Optimize", Styles.TitleLabel);
 
-                    using (new BGColoredScope(makeDuplicate, Color.green, Color.grey))
+                    using (new BgColoredScope(MakeDuplicate, Color.green, Color.grey))
                         if (GUILayout.Button(new GUIContent("Backup", "Creates a backup of the controller before optimizing."), GUILayout.ExpandWidth(false)))
-                            makeDuplicate = !makeDuplicate;
+                            MakeDuplicate = !MakeDuplicate;
 
-                    using (new EditorGUI.DisabledScope(currentOptInfo == null || currentOptInfo.Count == 0))
-                    using (new BGColoredScope(allReplace, Color.grey, Color.green, ColorOrange))
+                    using (new EditorGUI.DisabledScope(CurrentOptInfo == null || CurrentOptInfo.Count == 0))
+                    using (new BgColoredScope(AllReplace, Color.grey, Color.green, ColorOrange))
                         if (GUILayout.Button(new GUIContent("All Replace", "Will remove the optimized layer on apply."), GUILayout.ExpandWidth(false)))
                         {
-                            bool newState = ToggleBoolState(ref allReplace);
-                            for (int i = 0; i < currentOptInfo.Count; i++)
-                                currentOptInfo[i].isReplacing = newState;
+                            var newState = ToggleBoolState(ref AllReplace);
+                            if (CurrentOptInfo != null)
+                                for (var i = 0; i < CurrentOptInfo.Count; i++)
+                                    CurrentOptInfo[i].IsReplacing = newState;
                         }
 
                     
@@ -284,7 +281,7 @@ namespace DreadScripts.BlendTreeBulder
                 DrawSeparator();
 
 
-                if (!hasReadPriorityWarning)
+                if (!_hasReadPriorityWarning)
                 {
                     using (new GUILayout.VerticalScope(EditorStyles.helpBox))
                     {
@@ -292,25 +289,25 @@ namespace DreadScripts.BlendTreeBulder
                         using (new GUILayout.HorizontalScope())
                         {
                             if (GUILayout.Button("Understood"))
-                                hasReadPriorityWarning = true;
+                                _hasReadPriorityWarning = true;
                             if (GUILayout.Button("Don't Show Again.", GUILayout.ExpandWidth(false)))
                             {
-                                PlayerPrefs.SetInt(PRIORITY_WARNING_PREFKEY, 1);
-                                hasReadPriorityWarning = true;
+                                PlayerPrefs.SetInt(PriorityWarningPrefkey, 1);
+                                _hasReadPriorityWarning = true;
                             }
                         }
 
                         EditorGUILayout.Space();
                     }
                 }
-                if (currentOptInfo == null)
+                if (CurrentOptInfo == null)
                 {
-                    if (GUILayout.Button("Get Optimization Info", Styles.comicallyLargeButton))
-                        currentOptInfo = GetOptimizationInfo(fxController);
+                    if (GUILayout.Button("Get Optimization Info", Styles.ComicallyLargeButton))
+                        CurrentOptInfo = GetOptimizationInfo(FXController);
                 }
                 else
                 {
-                    if (currentOptInfo.Count == 0)
+                    if (CurrentOptInfo.Count == 0)
                     {
                         using (new GUILayout.VerticalScope(EditorStyles.helpBox))
                         {
@@ -319,18 +316,18 @@ namespace DreadScripts.BlendTreeBulder
                             {
                                 DrawBackButton();
                                 if (GUILayout.Button("Refresh"))
-                                    currentOptInfo = GetOptimizationInfo(fxController);
+                                    CurrentOptInfo = GetOptimizationInfo(FXController);
                             }
 
                         }
                     }
                     else
                     {
-                        for (int i = 0; i < currentOptInfo.Count; i++)
+                        for (var i = 0; i < CurrentOptInfo.Count; i++)
                         {
-                            var b = currentOptInfo[i];
+                            var b = CurrentOptInfo[i];
 
-                            using (new EditorGUI.DisabledScope(!b.isActive))
+                            using (new EditorGUI.DisabledScope(!b.IsActive))
                             using (new GUILayout.VerticalScope(EditorStyles.helpBox))
                             {
                                 using (new GUILayout.HorizontalScope())
@@ -338,37 +335,37 @@ namespace DreadScripts.BlendTreeBulder
                                     using (new IsolatedDisableScope(false))
                                     {
                                         EditorGUI.BeginChangeCheck();
-                                        b.isActive = EditorGUILayout.Toggle(b.isActive, GUILayout.Width(12), GUILayout.Height(18));
+                                        b.IsActive = EditorGUILayout.Toggle(b.IsActive, GUILayout.Width(12), GUILayout.Height(18));
                                         if (EditorGUI.EndChangeCheck())
                                         {
-                                            b.foldout = false;
-                                            allActive = GetBoolState(currentOptInfo.optBranches.Select(branch => branch.isActive));
+                                            b.Foldout = false;
+                                            AllActive = GetBoolState(CurrentOptInfo.OptBranches.Select(branch => branch.IsActive));
                                         }
                                     }
-                                    string paramLabel = string.IsNullOrEmpty(b.baseBranch.parameter) ? "No Parameter" : b.baseBranch.parameter;
+                                    var paramLabel = string.IsNullOrEmpty(b.BaseBranch.Parameter) ? "No Parameter" : b.BaseBranch.Parameter;
 
-                                    GUIContent foldIcon = b.foldout ? Content.foldoutIconOn : Content.foldoutIconOff;
-                                    if (GUILayout.Button(foldIcon, Styles.iconButton, GUILayout.Width(15), GUILayout.Height(18)))
-                                        b.foldout = !b.foldout;
-                                    GUILayout.Label(b.baseBranch.name, Styles.foldoutLabel);
-                                    GUILayout.Label($"({b.linkedLayerIndex})", Styles.faintLabel);
-                                    GUILayout.Label($"[{paramLabel}]", Styles.italicFaintLabel);
+                                    var foldIcon = b.Foldout ? Content.FoldoutIconOn : Content.FoldoutIconOff;
+                                    if (GUILayout.Button(foldIcon, Styles.IconButton, GUILayout.Width(15), GUILayout.Height(18)))
+                                        b.Foldout = !b.Foldout;
+                                    GUILayout.Label(b.BaseBranch.Name, Styles.FoldoutLabel);
+                                    GUILayout.Label($"({b.LinkedLayerIndex})", Styles.FaintLabel);
+                                    GUILayout.Label($"[{paramLabel}]", Styles.ItalicFaintLabel);
                                     //b.foldout = EditorGUILayout.Foldout(b.foldout, fullName);
                                     
                                     GUILayout.FlexibleSpace();
-                                    GUILayout.Label(b.displayType, Styles.typeLabel);
+                                    GUILayout.Label(b.DisplayType, Styles.TypeLabel);
                                     using (new IsolatedDisableScope(false))
                                     {
-                                        if (!string.IsNullOrEmpty(b.infoLog)) GUILayout.Label(new GUIContent(Content.infoIcon) { tooltip = b.infoLog }, Styles.iconButton, GUILayout.Width(18), GUILayout.Height(18));
-                                        if (!string.IsNullOrEmpty(b.warnLog)) GUILayout.Label(new GUIContent(Content.warnIcon) { tooltip = b.warnLog }, Styles.iconButton, GUILayout.Width(18), GUILayout.Height(18));
-                                        if (!string.IsNullOrEmpty(b.errorLog)) GUILayout.Label(new GUIContent(Content.errorIcon) { tooltip = b.errorLog }, Styles.iconButton, GUILayout.Width(18), GUILayout.Height(18));
+                                        if (!string.IsNullOrEmpty(b.InfoLog)) GUILayout.Label(new GUIContent(Content.InfoIcon) { tooltip = b.InfoLog }, Styles.IconButton, GUILayout.Width(18), GUILayout.Height(18));
+                                        if (!string.IsNullOrEmpty(b.WarnLog)) GUILayout.Label(new GUIContent(Content.WarnIcon) { tooltip = b.WarnLog }, Styles.IconButton, GUILayout.Width(18), GUILayout.Height(18));
+                                        if (!string.IsNullOrEmpty(b.ErrorLog)) GUILayout.Label(new GUIContent(Content.ErrorIcon) { tooltip = b.ErrorLog }, Styles.IconButton, GUILayout.Width(18), GUILayout.Height(18));
                                     }
 
-                                    using (new BGColoredScope(b.isReplacing, Color.green, Color.grey))
+                                    using (new BgColoredScope(b.IsReplacing, Color.green, Color.grey))
                                         if (GUILayout.Button(new GUIContent("Replace Layer", "Will remove the optimized animator layer on apply.")))
                                         {
-                                            b.isReplacing = !b.isReplacing;
-                                            allReplace = GetBoolState(currentOptInfo.optBranches.Select(branch => branch.isReplacing));
+                                            b.IsReplacing = !b.IsReplacing;
+                                            AllReplace = GetBoolState(CurrentOptInfo.OptBranches.Select(branch => branch.IsReplacing));
                                         }
 
                                     /*using (new IsolatedDisableScope(false))
@@ -381,11 +378,11 @@ namespace DreadScripts.BlendTreeBulder
                                         }*/
                                 }
 
-                                if (!b.foldout) continue;
-                                var targetChildren = b.baseBranch.childMotions;
+                                if (!b.Foldout) continue;
+                                var targetChildren = b.BaseBranch.ChildMotions;
                                 EditorGUI.BeginChangeCheck();
 
-                                using (new EditorGUI.DisabledScope(!b.canEdit))
+                                using (new EditorGUI.DisabledScope(!b.CanEdit))
                                     switch (targetChildren.Length)
                                     {
                                         case 1:
@@ -403,7 +400,7 @@ namespace DreadScripts.BlendTreeBulder
                                             }
                                             break;
                                         default:
-                                            for (int j = 0; j < targetChildren.Length; j++)
+                                            for (var j = 0; j < targetChildren.Length; j++)
                                             {
                                                 targetChildren[j].motion.QuickField(GUIContent.none);
                                                 DoPlaceholderLabel($"Motion {j + 1}", 100, 24);
@@ -412,7 +409,7 @@ namespace DreadScripts.BlendTreeBulder
                                     }
 
                                 if (EditorGUI.EndChangeCheck())
-                                    b.baseBranch.childMotions = targetChildren;
+                                    b.BaseBranch.ChildMotions = targetChildren;
 
                             }
                         }
@@ -422,17 +419,17 @@ namespace DreadScripts.BlendTreeBulder
                         using (new GUILayout.HorizontalScope())
                         {
                             DrawBackButton();
-                            using (new EditorGUI.DisabledScope(currentOptInfo.optBranches.TrueForAll(b => !b.isActive)))
-                            using (new BGColoredScope(Color.green))
-                                if (GUILayout.Button("Optimize!", Styles.comicallyLargeButton))
+                            using (new EditorGUI.DisabledScope(CurrentOptInfo.OptBranches.TrueForAll(b => !b.IsActive)))
+                            using (new BgColoredScope(Color.green))
+                                if (GUILayout.Button("Optimize!", Styles.ComicallyLargeButton))
                                 {
-                                    if (makeDuplicate) Duplicate(fxController).name += " (Backup)";
-                                    ApplyOptimization(currentOptInfo);
-                                    currentOptInfo = GetOptimizationInfo(fxController);
+                                    if (MakeDuplicate) Duplicate(FXController).name += " (Backup)";
+                                    ApplyOptimization(CurrentOptInfo);
+                                    CurrentOptInfo = GetOptimizationInfo(FXController);
                                 }
 
-                            if (GUILayout.Button("Refresh", Styles.comicallyLargeButton, GUILayout.ExpandWidth(false)))
-                                currentOptInfo = GetOptimizationInfo(fxController);
+                            if (GUILayout.Button("Refresh", Styles.ComicallyLargeButton, GUILayout.ExpandWidth(false)))
+                                CurrentOptInfo = GetOptimizationInfo(FXController);
                         }
 
                     }
@@ -445,44 +442,44 @@ namespace DreadScripts.BlendTreeBulder
             EditorGUILayout.Space();
             using (new GUILayout.HorizontalScope())
             {
-                if (currentStep != 0)
+                if (_currentStep != 0)
                     DrawBackButton();
                 using (new EditorGUI.DisabledScope(!nextCondition))
-                using (new BGColoredScope(nextCondition, Color.green, Color.grey))
+                using (new BgColoredScope(nextCondition, Color.green, Color.grey))
                     if (GUILayout.Button("Next"))
-                        currentStep++;
+                        _currentStep++;
                     
             }
         }
 
         private static void DrawBackButton()
         {
-            if (GUILayout.Button(Content.backIcon, Styles.iconButton, GUILayout.Width(18), GUILayout.Height(EditorGUIUtility.singleLineHeight)))
-                currentStep--;
+            if (GUILayout.Button(Content.BackIcon, Styles.IconButton, GUILayout.Width(18), GUILayout.Height(EditorGUIUtility.singleLineHeight)))
+                _currentStep--;
 
         }
 
 
         private static void OnAvatarChanged()
         {
-            if (!avatar) return;
-            fxController = avatar.GetPlayableLayer(VRCAvatarDescriptor.AnimLayerType.FX);
-            if (!exParameters) exParameters = avatar.expressionParameters;
-            masterBlendtree = GetMasterBlendTree(avatar);
+            if (!Avatar) return;
+            FXController = Avatar.GetPlayableLayer(VRCAvatarDescriptor.AnimLayerType.FX);
+            if (!_exParameters) _exParameters = Avatar.expressionParameters;
+            _masterBlendtree = GetMasterBlendTree(Avatar);
         }
 
         private static void ResetStepsIf(bool condition, bool throwError)
         {
             if (!condition) return;
-            currentStep = 0;
-            currentOptInfo = null;
-            if (throwError) throw new Exception("[BlendTree Buildter] Unhandled exception occured. Steps have been reset.");
+            _currentStep = 0;
+            CurrentOptInfo = null;
+            if (throwError) throw new Exception("[BlendTree Builder] Unhandled exception occured. Steps have been reset.");
 
         }
 
         private void OnEnable()
         {
-            hasReadPriorityWarning = PlayerPrefs.GetInt(PRIORITY_WARNING_PREFKEY, 0) == 1;
+            _hasReadPriorityWarning = PlayerPrefs.GetInt(PriorityWarningPrefkey, 0) == 1;
             AutoDetectAvatar();
         }
 
@@ -492,7 +489,7 @@ namespace DreadScripts.BlendTreeBulder
         }
 
         #region Sub-Methods
-        private static void AutoDetectAvatar() => avatar = avatar ? avatar : FindObjectOfType<VRCAvatarDescriptor>();
+        private static void AutoDetectAvatar() => Avatar = Avatar ? Avatar : FindObjectOfType<VRCAvatarDescriptor>();
         #endregion
     }
 }

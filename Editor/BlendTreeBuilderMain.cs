@@ -5,15 +5,15 @@ using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
 using VRC.SDK3.Avatars.Components;
-using static DreadScripts.BlendTreeBulder.BlendTreeBuilderHelper;
+using static Editor.BlendTreeBuilderHelper;
 
-namespace DreadScripts.BlendTreeBulder
+namespace Editor
 {
     public class BlendTreeBuilderMain
     {
-        private const string LAYER_ANYSTATE_IDENTIFIER = "BTB_MasterTree";
-        private const string LAYER_NAME_IDENTIFIER = "BTB/MasterTree";
-        private const string WEIGHTONE_PARAMETER_NAME = "BTB/One";
+        private const string LayerAnystateIdentifier = "BTB_MasterTree";
+        private const string LayerNameIdentifier = "BTB/MasterTree";
+        private const string WeightoneParameterName = "BTB/One";
         public static BlendTree GetMasterBlendTree(VRCAvatarDescriptor avi)
         {
             var fx = avi.GetPlayableLayer(VRCAvatarDescriptor.AnimLayerType.FX);
@@ -29,7 +29,7 @@ namespace DreadScripts.BlendTreeBulder
                     continue;
                 }
 
-                if (l.name != LAYER_NAME_IDENTIFIER && !l.stateMachine.anyStateTransitions.Any(t => t && t.isExit && t.mute && t.name == LAYER_ANYSTATE_IDENTIFIER)) continue;
+                if (l.name != LayerNameIdentifier && !l.stateMachine.anyStateTransitions.Any(t => t && t.isExit && t.mute && t.name == LayerAnystateIdentifier)) continue;
 
                 var s = l.stateMachine.defaultState;
                 if (!s) continue;
@@ -51,7 +51,7 @@ namespace DreadScripts.BlendTreeBulder
         }
         public static BlendTree GenerateMasterBlendTree(AnimatorController con)
         {
-            con.ReadyParameter(WEIGHTONE_PARAMETER_NAME, AnimatorControllerParameterType.Float, 1);
+            con.ReadyParameter(WeightoneParameterName, AnimatorControllerParameterType.Float, 1);
 
             var m = con.AddLayer(con.MakeUniqueLayerName("BTB/MasterTree"), 1).stateMachine;
             var s = m.AddState("Master BlendTree (WD On)", new Vector3(30, 160));
@@ -61,7 +61,7 @@ namespace DreadScripts.BlendTreeBulder
             var identifierTransition = m.AddAnyStateTransition((AnimatorState)null);
             identifierTransition.mute = true;
             identifierTransition.isExit = true;
-            identifierTransition.name = LAYER_ANYSTATE_IDENTIFIER;
+            identifierTransition.name = LayerAnystateIdentifier;
 
             return tree;
         }
@@ -71,11 +71,11 @@ namespace DreadScripts.BlendTreeBulder
 
         public static OptimizationInfo GetOptimizationInfo(AnimatorController con)
         {
-            OptimizationInfo info = new OptimizationInfo() { targetController = con, masterTree = GetMasterBlendTree(con) };
-            for (int i = 0; i < con.layers.Length; i++)
+            var info = new OptimizationInfo() { TargetController = con, MasterTree = GetMasterBlendTree(con) };
+            for (var i = 0; i < con.layers.Length; i++)
             {
-                if (con.layers[i].name == LAYER_NAME_IDENTIFIER || con.layers[i].stateMachine.anyStateTransitions.Any(t => t && t.isExit && t.mute && t.name == LAYER_ANYSTATE_IDENTIFIER)) continue;
-                if (OptimizeBranch.TryExtract(con, i, out OptimizeBranch b))
+                if (con.layers[i].name == LayerNameIdentifier || con.layers[i].stateMachine.anyStateTransitions.Any(t => t && t.isExit && t.mute && t.name == LayerAnystateIdentifier)) continue;
+                if (OptimizeBranch.TryExtract(con, i, out var b))
                     info.Add(b);
             }
 
@@ -83,33 +83,33 @@ namespace DreadScripts.BlendTreeBulder
         }
         public static void ApplyOptimization(OptimizationInfo info)
         {
-            var con = info.targetController;
+            var con = info.TargetController;
             if (!con) throw new NullReferenceException("Optimization target controller cannot be null!");
-            var folderPath = $"{BlendTreeBuilderWindow.GENERATED_ASSETS_PATH}/{con.name}";
+            var folderPath = $"{BlendTreeBuilderWindow.GeneratedAssetsPath}/{con.name}";
 
-            Undo.RecordObject(info.targetController, "Apply DBT Optimization");
-            var masterTree = info.masterTree ?? GetOrGenerateMasterBlendTree(info.targetController);
+            Undo.RecordObject(info.TargetController, "Apply DBT Optimization");
+            var masterTree = info.MasterTree ?? GetOrGenerateMasterBlendTree(info.TargetController);
             Undo.RecordObject(masterTree, "Apply DBT Optimization");
 
             var parameters = con.parameters;
-            for (int i = info.Count - 1; i >= 0; i--)
+            for (var i = info.Count - 1; i >= 0; i--)
             {
                 var optBranch = info[i];
-                if (!optBranch.isActive) continue;
-                if (optBranch.isReplacing && optBranch.linkedLayer != null)
+                if (!optBranch.IsActive) continue;
+                if (optBranch.IsReplacing && optBranch.LinkedLayer != null)
                 {
-                    var l = optBranch.linkedLayer;
-                    if (con.layers.GetIndexOf(l2 => l.stateMachine == l2.stateMachine, out int index))
+                    var l = optBranch.LinkedLayer;
+                    if (con.layers.GetIndexOf(l2 => l.stateMachine == l2.stateMachine, out var index))
                     {
                         Debug.Log($"Removed Layer: {l.name}");
                         con.RemoveLayer(index);
                     }
-                    else RedLog($"Couldn't find Layer to remove associated with {optBranch.baseBranch.name}!");
+                    else RedLog($"Couldn't find Layer to remove associated with {optBranch.BaseBranch.Name}!");
                 }
 
-                if (optBranch.isMotionTimed)
+                if (optBranch.IsMotionTimed)
                 {
-                    var clip = optBranch.baseBranch.childMotions[0].motion as AnimationClip;
+                    var clip = optBranch.BaseBranch.ChildMotions[0].motion as AnimationClip;
                     if (!clip) continue;
 
                     var clipKeyFrames = KeyFrameSplitClip(clip);
@@ -117,7 +117,7 @@ namespace DreadScripts.BlendTreeBulder
                     try
                     {
                         AssetDatabase.StartAssetEditing();
-                        for (int j = 0; j < clipKeyFrames.Length; j++)
+                        for (var j = 0; j < clipKeyFrames.Length; j++)
                         {
                             var clipPath = ReadyAssetPath(folderPath, $"{clipKeyFrames[j].Item2.name}.anim", true);
                             AssetDatabase.CreateAsset(clipKeyFrames[j].Item2, clipPath);
@@ -125,8 +125,8 @@ namespace DreadScripts.BlendTreeBulder
                     }
                     finally { AssetDatabase.StopAssetEditing(); }
 
-                    ChildMotion[] newChildren = new ChildMotion[clipKeyFrames.Length];
-                    for (int j = 0; j < clipKeyFrames.Length; j++)
+                    var newChildren = new ChildMotion[clipKeyFrames.Length];
+                    for (var j = 0; j < clipKeyFrames.Length; j++)
                     {
                         newChildren[j] = new ChildMotion()
                         {
@@ -136,14 +136,14 @@ namespace DreadScripts.BlendTreeBulder
                         };
                     }
 
-                    optBranch.baseBranch.childMotions = newChildren;
+                    optBranch.BaseBranch.ChildMotions = newChildren;
                 }
 
                 AppendBranch(masterTree, optBranch);
 
-                if (parameters.GetIndexOf(p => p.name == optBranch.baseBranch.parameter, out int paramIndex)) 
+                if (parameters.GetIndexOf(p => p.name == optBranch.BaseBranch.Parameter, out var paramIndex)) 
                     parameters[paramIndex].type = AnimatorControllerParameterType.Float;
-                else con.ReadyParameter(optBranch.baseBranch.parameter, AnimatorControllerParameterType.Float, 0);
+                else con.ReadyParameter(optBranch.BaseBranch.Parameter, AnimatorControllerParameterType.Float, 0);
 
             }
             con.parameters = parameters;
@@ -158,25 +158,25 @@ namespace DreadScripts.BlendTreeBulder
         public static void AppendBranch(BlendTree targetTree, Branch branch)
         {
             Motion finalMotion;
-            if (branch.childMotions.Length == 1)
-                finalMotion = branch.childMotions[0].motion;
+            if (branch.ChildMotions.Length == 1)
+                finalMotion = branch.ChildMotions[0].motion;
             else
             {
-                BlendTree newTree = new BlendTree()
+                var newTree = new BlendTree()
                 {
                     useAutomaticThresholds = false,
-                    name = branch.name,
-                    blendParameter = branch.parameter,
-                    children = branch.childMotions
+                    name = branch.Name,
+                    blendParameter = branch.Parameter,
+                    children = branch.ChildMotions
                 };
                 CreateBlendTreeAsset(targetTree, newTree);
                 finalMotion = newTree;
             }
 
-            ChildMotion[] children = targetTree.children;
-            ChildMotion newChild = new ChildMotion()
+            var children = targetTree.children;
+            var newChild = new ChildMotion()
             {
-                directBlendParameter = WEIGHTONE_PARAMETER_NAME,
+                directBlendParameter = WeightoneParameterName,
                 motion = finalMotion,
                 timeScale = 1
             };
@@ -211,8 +211,8 @@ namespace DreadScripts.BlendTreeBulder
 
         public static void FillTreeWithEmpty(BlendTree mainTree)
         {
-            const string folderPath = BlendTreeBuilderWindow.GENERATED_ASSETS_PATH;
-            var emptyClipPath = ReadyAssetPath(folderPath,"Empty Clip.anim", false);
+            const string folderPath = BlendTreeBuilderWindow.GeneratedAssetsPath;
+            var emptyClipPath = ReadyAssetPath(folderPath,"Empty Clip.anim");
             var emptyClip = AssetDatabase.LoadAssetAtPath<AnimationClip>(emptyClipPath);
             if (!emptyClip)
             {

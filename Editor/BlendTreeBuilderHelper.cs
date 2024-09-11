@@ -10,7 +10,7 @@ using VRC.SDK3.Avatars.Components;
 using VRC.SDK3.Avatars.ScriptableObjects;
 using Object = UnityEngine.Object;
 
-namespace DreadScripts.BlendTreeBulder
+namespace Editor
 {
     public static class BlendTreeBuilderHelper
     {
@@ -23,11 +23,11 @@ namespace DreadScripts.BlendTreeBulder
         }
         internal static string ReadyAssetPath(string path, bool makeUnique = false, PathOption pathOption = PathOption.Normal)
         {
-            bool forceFolder = pathOption == PathOption.ForceFolder;
-            bool forceFile = pathOption == PathOption.ForceFile;
+            var forceFolder = pathOption == PathOption.ForceFolder;
+            var forceFile = pathOption == PathOption.ForceFile;
 
             path = forceFile ? LegalizeName(path) : forceFolder ? LegalizePath(path) : LegalizeFullPath(path);
-            bool isFolder = forceFolder || (!forceFile && string.IsNullOrEmpty(Path.GetExtension(path)));
+            var isFolder = forceFolder || (!forceFile && string.IsNullOrEmpty(Path.GetExtension(path)));
 
             if (isFolder)
             {
@@ -46,8 +46,8 @@ namespace DreadScripts.BlendTreeBulder
             else
             {
                 const string basePath = "Assets";
-                string folderPath = Path.GetDirectoryName(path);
-                string fileName = Path.GetFileName(path);
+                var folderPath = Path.GetDirectoryName(path);
+                var fileName = Path.GetFileName(path);
 
                 if (string.IsNullOrEmpty(folderPath))
                     folderPath = basePath;
@@ -72,22 +72,19 @@ namespace DreadScripts.BlendTreeBulder
         {
             if (string.IsNullOrEmpty(fileName))
                 return ReadyAssetPath(LegalizePath(folderPath), makeUnique, PathOption.ForceFolder);
-            if (string.IsNullOrEmpty(folderPath))
-                return ReadyAssetPath(LegalizeName(fileName), makeUnique, PathOption.ForceFile);
-
-            return ReadyAssetPath($"{LegalizePath(folderPath)}/{LegalizeName(fileName)}", makeUnique);
+            return string.IsNullOrEmpty(folderPath) ? ReadyAssetPath(LegalizeName(fileName), makeUnique, PathOption.ForceFile) : ReadyAssetPath($"{LegalizePath(folderPath)}/{LegalizeName(fileName)}", makeUnique);
         }
 
-        internal static string ReadyAssetPath(Object buddyAsset, string fullName = "", bool makeUnique = true)
+        private static string ReadyAssetPath(Object buddyAsset, string fullName = "", bool makeUnique = true)
         {
             var buddyPath = AssetDatabase.GetAssetPath(buddyAsset);
-            string folderPath = Path.GetDirectoryName(buddyPath);
+            var folderPath = Path.GetDirectoryName(buddyPath);
             if (string.IsNullOrEmpty(fullName))
                 fullName = Path.GetFileName(buddyPath);
             return ReadyAssetPath(folderPath, fullName, makeUnique);
         }
 
-        internal static string LegalizeFullPath(string path)
+        private static string LegalizeFullPath(string path)
         {
             if (string.IsNullOrEmpty(path))
             {
@@ -96,10 +93,10 @@ namespace DreadScripts.BlendTreeBulder
             }
 
             var ext = Path.GetExtension(path);
-            bool isFolder = string.IsNullOrEmpty(ext);
+            var isFolder = string.IsNullOrEmpty(ext);
             if (isFolder) return LegalizePath(path);
 
-            string folderPath = Path.GetDirectoryName(path);
+            var folderPath = Path.GetDirectoryName(path);
             var fileName = LegalizeName(Path.GetFileNameWithoutExtension(path));
 
             if (string.IsNullOrEmpty(folderPath)) return $"{fileName}{ext}";
@@ -107,26 +104,28 @@ namespace DreadScripts.BlendTreeBulder
 
             return $"{folderPath}/{fileName}{ext}";
         }
-        internal static string LegalizePath(string path)
+
+        private static string LegalizePath(string path)
         {
-            string regexFolderReplace = Regex.Escape(new string(Path.GetInvalidPathChars()));
+            var regexFolderReplace = Regex.Escape(new string(Path.GetInvalidPathChars()));
 
             path = path.Replace('\\', '/');
             if (path.IndexOf('/') > 0)
-                path = string.Join("/", path.Split('/').Select(s => Regex.Replace(s, $@"[{regexFolderReplace}]", "-")));
+                path = string.Join("/", path.Split('/').Select(s => Regex.Replace(s, $"[{regexFolderReplace}]", "-")));
 
             return path;
 
         }
-        internal static string LegalizeName(string name)
+
+        private static string LegalizeName(string name)
         {
-            string regexFileReplace = Regex.Escape(new string(Path.GetInvalidFileNameChars()));
-            return string.IsNullOrEmpty(name) ? "Unnamed" : Regex.Replace(name, $@"[{regexFileReplace}]", "-");
+            var regexFileReplace = Regex.Escape(new string(Path.GetInvalidFileNameChars()));
+            return string.IsNullOrEmpty(name) ? "Unnamed" : Regex.Replace(name, $"[{regexFileReplace}]", "-");
         }
         #endregion
 
         #region VRC Stuff
-        internal static readonly string[] builtinParameters = new string[] {
+        internal static readonly string[] BuiltinParameters = {
             "IsLocal",
             "Viseme",
             "GestureLeft",
@@ -150,8 +149,11 @@ namespace DreadScripts.BlendTreeBulder
 
         internal static AnimatorController GetPlayableLayer(this VRCAvatarDescriptor avi, VRCAvatarDescriptor.AnimLayerType type)
             => avi.baseAnimationLayers.Concat(avi.specialAnimationLayers).FirstOrDefault(p => p.type == type).animatorController as AnimatorController;
-        internal static bool SetPlayableLayer(this VRCAvatarDescriptor avatar, VRCAvatarDescriptor.AnimLayerType type, RuntimeAnimatorController controller)
+
+        private static bool SetPlayableLayer(this VRCAvatarDescriptor avatar, VRCAvatarDescriptor.AnimLayerType type, RuntimeAnimatorController controller)
         {
+            return SetPlayableLayerInternal(avatar.baseAnimationLayers) || SetPlayableLayerInternal(avatar.specialAnimationLayers);
+
             bool SetPlayableLayerInternal(VRCAvatarDescriptor.CustomAnimLayer[] playableLayers)
             {
                 for (var i = 0; i < playableLayers.Length; i++)
@@ -165,12 +167,10 @@ namespace DreadScripts.BlendTreeBulder
                     }
                 return false;
             }
-
-            return SetPlayableLayerInternal(avatar.baseAnimationLayers) || SetPlayableLayerInternal(avatar.specialAnimationLayers);
         }
         internal static AnimatorController ReadyPlayableLayer(this VRCAvatarDescriptor avatar, VRCAvatarDescriptor.AnimLayerType type, string folderPath)
         {
-            AnimatorController controller = avatar.GetPlayableLayer(type);
+            var controller = avatar.GetPlayableLayer(type);
             if (!controller)
             {
                 controller = new AnimatorController();
@@ -187,7 +187,7 @@ namespace DreadScripts.BlendTreeBulder
         }
         internal static VRCExpressionParameters ReadyExpressionParameters(this VRCAvatarDescriptor avatar, string folderPath)
         {
-            VRCExpressionParameters parameters = avatar.expressionParameters;
+            var parameters = avatar.expressionParameters;
             if (!parameters)
             {
                 parameters = ScriptableObject.CreateInstance<VRCExpressionParameters>();
@@ -210,12 +210,10 @@ namespace DreadScripts.BlendTreeBulder
         {
             foreach (var p in controller.parameters)
             {
-                if (p.name == parameter)
-                {
-                    if (p.type != type)
-                        Debug.LogWarning($"Type mismatch! Parameter {parameter} already exists in {controller.name} but with type {p.type} rather than {type}");
-                    return;
-                }
+                if (p.name != parameter) continue;
+                if (p.type != type)
+                    Debug.LogWarning($"Type mismatch! Parameter {parameter} already exists in {controller.name} but with type {p.type} rather than {type}");
+                return;
             }
 
             controller.AddParameter(new AnimatorControllerParameter { name = parameter, type = type, defaultBool = defaultValue != 0, defaultInt = (int)defaultValue, defaultFloat = defaultValue });
@@ -242,11 +240,11 @@ namespace DreadScripts.BlendTreeBulder
 
         internal static BlendTree CreateBlendTreeInState(this AnimatorState state, string name = "")
         {
-            BlendTree newTree = new BlendTree() { name = name };
+            var newTree = new BlendTree { name = name };
             Undo.RecordObject(state, "Create Blendtree In State");
             Undo.RegisterCreatedObjectUndo(newTree, "Create Blendtree In State");
 
-            string statePath = AssetDatabase.GetAssetPath(state);
+            var statePath = AssetDatabase.GetAssetPath(state);
             var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(statePath);
             if (controller)
             {
@@ -271,7 +269,7 @@ namespace DreadScripts.BlendTreeBulder
             return newTree;
         }
 
-        internal static void Iteratetransitions(this AnimatorStateMachine machine, System.Func<AnimatorTransitionBase, bool> transitionAction, bool deep = true)
+        internal static void Iteratetransitions(this AnimatorStateMachine machine, Func<AnimatorTransitionBase, bool> transitionAction, bool deep = true)
         {
             if (machine.entryTransitions.Any(t => transitionAction(t))) return;
             if (machine.anyStateTransitions.Any(t => transitionAction(t))) return;
@@ -284,16 +282,16 @@ namespace DreadScripts.BlendTreeBulder
                     cm.stateMachine.Iteratetransitions(transitionAction);
         }
 
-        internal static void IterateTreeChildren(this BlendTree tree, System.Func<ChildMotion, ChildMotion> func, bool deep = true, bool undo = false)
+        internal static void IterateTreeChildren(this BlendTree tree, Func<ChildMotion, ChildMotion> func, bool deep = true, bool undo = false)
         {
             if (undo) Undo.RecordObject(tree, "IterateTreeUndo");
-            ChildMotion[] children = tree.children;
-            for (int i = 0; i < children.Length; i++)
+            var children = tree.children;
+            for (var i = 0; i < children.Length; i++)
             {
                 if (deep)
                 {
                     var tree2 = children[i].motion as BlendTree;
-                    if (tree2 != null) tree2.IterateTreeChildren(func, true);
+                    if (tree2 != null) tree2.IterateTreeChildren(func);
                     else children[i] = func(children[i]);
                 } else children[i] = func(children[i]);
             }
@@ -313,16 +311,16 @@ namespace DreadScripts.BlendTreeBulder
             var objectBinds = AnimationUtility.GetObjectReferenceCurveBindings(clip);
             var objectCurves = objectBinds.Select(bind => AnimationUtility.GetObjectReferenceCurve(clip, bind)).ToArray();
 
-            float[] usedTimes = floatCurves.SelectMany(c => c.keys.Select(k => k.time))
+            var usedTimes = floatCurves.SelectMany(c => c.keys.Select(k => k.time))
                 .Concat(objectCurves.SelectMany(c => c.Select(k => k.time))).Distinct().ToArray();
 
-            (float, AnimationClip)[] clipKeyFrames = new (float, AnimationClip)[usedTimes.Length];
-            for (int i = 0; i < usedTimes.Length; i++)
+            var clipKeyFrames = new (float, AnimationClip)[usedTimes.Length];
+            for (var i = 0; i < usedTimes.Length; i++)
             {
                 var time = usedTimes[i];
-                var newClip = new AnimationClip(){name = $"{clip.name}_{i}"};
+                var newClip = new AnimationClip {name = $"{clip.name}_{i}"};
 
-                for (int j = 0; j < floatBinds.Length; j++)
+                for (var j = 0; j < floatBinds.Length; j++)
                 {
                     var bind = floatBinds[j];
                     var curve = floatCurves[j];
@@ -336,13 +334,13 @@ namespace DreadScripts.BlendTreeBulder
                     Object objectValue;
 
                     //cringe code
-                    if (keyArray.GetIndexOf(k => k.time == time, out int exactIndex))
+                    if (keyArray.GetIndexOf(k => Mathf.Approximately(k.time, time), out var exactIndex))
                         objectValue = keyArray[exactIndex].value;
-                    else if (keyArray.GetIndexOf(k => k.time > time, out int higherIndex))
+                    else if (keyArray.GetIndexOf(k => k.time > time, out var higherIndex))
                         objectValue = keyArray[higherIndex - 1].value;
-                    else objectValue = keyArray[keyArray.Length - 1].value;
+                    else objectValue = keyArray[^1].value;
 
-                    AnimationUtility.SetObjectReferenceCurve(newClip, bind, new ObjectReferenceKeyframe[] {new ObjectReferenceKeyframe() {time = time, value = objectValue}});
+                    AnimationUtility.SetObjectReferenceCurve(newClip, bind, new[] {new ObjectReferenceKeyframe {time = time, value = objectValue}});
                 }
 
                 clipKeyFrames[i] = (time/clip.length, newClip);
@@ -353,51 +351,50 @@ namespace DreadScripts.BlendTreeBulder
 
 
         public static bool IsConstant(Motion m) => IsConstant(m as AnimationClip) && IsConstant(m as BlendTree);
-        public static bool IsConstant(AnimationClip clip)
+
+        private static bool IsConstant(AnimationClip clip)
         {
             if (!clip) return true;
 
-            EditorCurveBinding[] allCurves = AnimationUtility.GetCurveBindings(clip).Concat(AnimationUtility.GetObjectReferenceCurveBindings(clip)).ToArray();
+            var allCurves = AnimationUtility.GetCurveBindings(clip).Concat(AnimationUtility.GetObjectReferenceCurveBindings(clip)).ToArray();
 
-            for (int i = 0; i < allCurves.Length; i++)
+            foreach (var c in allCurves)
             {
-                EditorCurveBinding c = allCurves[i];
+                var floatCurve = AnimationUtility.GetEditorCurve(clip, c);
+                var objectCurve = AnimationUtility.GetObjectReferenceCurve(clip, c);
+                var isFloatCurve = floatCurve != null;
 
-                AnimationCurve floatCurve = AnimationUtility.GetEditorCurve(clip, c);
-                ObjectReferenceKeyframe[] objectCurve = AnimationUtility.GetObjectReferenceCurve(clip, c);
-                bool isFloatCurve = floatCurve != null;
-
-                bool oneStartKey = (isFloatCurve && floatCurve.keys.Length == 1 && floatCurve.keys[0].time == 0) || (!isFloatCurve && objectCurve.Length <= 1 && objectCurve[0].time == 0);
+                var oneStartKey = (isFloatCurve && floatCurve.keys.Length == 1 && floatCurve.keys[0].time == 0) || (!isFloatCurve && objectCurve.Length <= 1 && objectCurve[0].time == 0);
                 if (oneStartKey)
                     continue;
 
                 if (isFloatCurve)
                 {
-                    float v1 = floatCurve.keys[0].value;
-                    float t1 = floatCurve.keys[0].time;
-                    for (int j = 1; j < floatCurve.keys.Length; j++)
+                    var v1 = floatCurve.keys[0].value;
+                    var t1 = floatCurve.keys[0].time;
+                    var j = 1;
+                    for (; j < floatCurve.keys.Length; j++)
                     {
                         var t2 = floatCurve.keys[j].time;
-                        if (floatCurve.keys[j].value != v1 || floatCurve.Evaluate((t1 + t2) / 2f) != v1)
+                        if (!Mathf.Approximately(floatCurve.keys[j].value, v1) || !Mathf.Approximately(floatCurve.Evaluate((t1 + t2) / 2f), v1))
                             return false;
                         t1 = t2;
                     }
                 }
                 else
                 {
-                    Object v = objectCurve[0].value;
+                    var v = objectCurve[0].value;
                     if (objectCurve.Any(o => o.value != v))
                         return false;
                 }
-
             }
             return true;
         }
 
-        public static bool IsConstant(BlendTree tree)
+        private static bool IsConstant(BlendTree tree)
         {
             if (!tree) return true;
-            bool isConstant = true;
+            var isConstant = true;
             tree.IterateTreeChildren(cm =>
             {
                 if (isConstant && cm.motion is AnimationClip clip)
@@ -409,15 +406,16 @@ namespace DreadScripts.BlendTreeBulder
         #endregion
 
         #region Asset Stuff
-        public static T CopyAssetAndReturn<T>(T obj, string newPath) where T : Object
+
+        private static T CopyAssetAndReturn<T>(T obj, string newPath) where T : Object
         {
-            string assetPath = AssetDatabase.GetAssetPath(obj);
-            Object mainAsset = AssetDatabase.LoadMainAssetAtPath(assetPath);
+            var assetPath = AssetDatabase.GetAssetPath(obj);
+            var mainAsset = AssetDatabase.LoadMainAssetAtPath(assetPath);
 
             if (!mainAsset) return null;
             if (obj != mainAsset)
             {
-                T newAsset = Object.Instantiate(obj);
+                var newAsset = Object.Instantiate(obj);
                 AssetDatabase.CreateAsset(newAsset, newPath);
                 return newAsset;
             }
@@ -427,26 +425,26 @@ namespace DreadScripts.BlendTreeBulder
         }
 
         public static T Duplicate<T>(T obj) where T : Object => CopyAssetAndReturn(obj, ReadyAssetPath(obj));
-        public static void MarkDirty(this Object obj) => EditorUtility.SetDirty(obj);
+
         #endregion
 
         #region General Stuff
-        internal static bool GetIndexOf<T>(this IEnumerable<T> collection, System.Func<T, bool> predicate, out int index)
+        internal static bool GetIndexOf<T>(this IEnumerable<T> collection, Func<T, bool> predicate, out int index)
         {
             index = -1;
-            using (var enumerator = collection.GetEnumerator())
-                while (enumerator.MoveNext())
-                {
-                    index++;
-                    if (predicate(enumerator.Current))
-                        return true;
-                }
+            using var enumerator = collection.GetEnumerator();
+            while (enumerator.MoveNext())
+            {
+                index++;
+                if (predicate(enumerator.Current))
+                    return true;
+            }
             return false;
         }
 
         internal static int GetBoolState(IEnumerable<bool> boolCollection, int defaultState = 0)
         {
-            int finalState = -1;
+            var finalState = -1;
             using (var enumerator = boolCollection.GetEnumerator())
                 while (enumerator.MoveNext())
                 {
@@ -478,13 +476,6 @@ namespace DreadScripts.BlendTreeBulder
                     boolstate = 0;
                     return false;
             }
-        }
-
-
-        internal static void Deconstruct<TKey, TValue>(this KeyValuePair<TKey, TValue> kvp, out TKey key, out TValue value)
-        {
-            key = kvp.Key;
-            value = kvp.Value;
         }
 
         #endregion

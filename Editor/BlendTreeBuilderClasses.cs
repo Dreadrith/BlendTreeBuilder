@@ -1,18 +1,19 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor.Animations;
 using UnityEngine;
-using static DreadScripts.BlendTreeBulder.BlendTreeBuilderHelper;
+using static Editor.BlendTreeBuilderHelper;
 
-namespace DreadScripts.BlendTreeBulder
+namespace Editor
 {
     public class Branch
     {
-        public string name;
-        public string parameter;
-        public ChildMotion[] childMotions;
+        public string Name;
+        public string Parameter;
+        public ChildMotion[] ChildMotions;
         
         
         //For the builder: Allow editing the tree directly through the tool window
@@ -21,35 +22,34 @@ namespace DreadScripts.BlendTreeBulder
 
     public class OptimizeBranch
     {
-        public Branch baseBranch;
-        public AnimatorControllerLayer linkedLayer;
-        public int linkedLayerIndex;
-        public bool isActive = true;
-        public bool isReplacing = true;
-        public bool canEdit = true;
-        public bool foldout;
-        public string infoLog;
-        public string warnLog;
-        public string errorLog;
-        public string displayType;
-        public bool isMotionTimed;
+        public readonly Branch BaseBranch;
+        public AnimatorControllerLayer LinkedLayer;
+        public int LinkedLayerIndex;
+        public bool IsActive = true;
+        public bool IsReplacing = true;
+        public bool CanEdit = true;
+        public bool Foldout;
+        public string InfoLog;
+        public string WarnLog;
+        public string ErrorLog;
+        public string DisplayType;
+        public bool IsMotionTimed;
 
-        public OptimizeBranch(Branch branch)
+        private OptimizeBranch(Branch branch)
         {
-            baseBranch = branch;
+            BaseBranch = branch;
         }
         public static bool TryExtract(AnimatorController controller, int layerIndex, out OptimizeBranch optBranch)
         {
-            bool mayChangeBehaviour = false;
             optBranch = null;
             var layer = controller.layers[layerIndex];
             if (!layer.stateMachine) return false;
 
-            string name = layer.name;
-            string parameter = string.Empty;
-            StringBuilder infoReport = new StringBuilder();
-            StringBuilder warnReport = new StringBuilder();
-            StringBuilder errorReport = new StringBuilder();
+            var name = layer.name;
+            var parameter = string.Empty;
+            var infoReport = new StringBuilder();
+            var warnReport = new StringBuilder();
+            var errorReport = new StringBuilder();
 
             //This switch check doesn't handle layers with no states in root statemachine properly
             //I.E: When states are in sub-statemachines
@@ -62,8 +62,8 @@ namespace DreadScripts.BlendTreeBulder
                     var state = layer.stateMachine.defaultState;
                     if (!state.motion) return false;
 
-                    bool hasAnyTransition = false;
-                    bool success = true;
+                    var hasAnyTransition = false;
+                    var success = true;
                     layer.stateMachine.Iteratetransitions(t =>
                     {
                         hasAnyTransition = true;
@@ -74,59 +74,57 @@ namespace DreadScripts.BlendTreeBulder
                     if (hasAnyTransition) errorReport.AppendLine("\n- Layer contains transitions from and/or to the only state.");
                     if (!state.timeParameterActive)
                     {
-                        Branch baseBranch = new Branch() {name = controller.layers[layerIndex].name, childMotions = new ChildMotion[] {new ChildMotion() {motion = state.motion}}};
-                        optBranch = new OptimizeBranch(baseBranch) {linkedLayer = layer, linkedLayerIndex = layerIndex, displayType = "Single State"};
+                        var baseBranch = new Branch {Name = controller.layers[layerIndex].name, ChildMotions = new[] {new ChildMotion {motion = state.motion}}};
+                        optBranch = new OptimizeBranch(baseBranch) {LinkedLayer = layer, LinkedLayerIndex = layerIndex, DisplayType = "Single State"};
                         return true;
                     }
 
-                    if (state.motion is AnimationClip)
+                    if (state.motion is not AnimationClip) return false;
                     {
-                        Branch baseBranch = new Branch() {name = controller.layers[layerIndex].name, parameter = state.timeParameter, childMotions = new ChildMotion[] {new ChildMotion() {motion = state.motion}}};
-                        optBranch = new OptimizeBranch(baseBranch) {linkedLayer = layer, linkedLayerIndex = layerIndex, displayType = "Motion Time State", isMotionTimed = true, canEdit = false};
+                        var baseBranch = new Branch {Name = controller.layers[layerIndex].name, Parameter = state.timeParameter, ChildMotions = new[] {new ChildMotion {motion = state.motion}}};
+                        optBranch = new OptimizeBranch(baseBranch) {LinkedLayer = layer, LinkedLayerIndex = layerIndex, DisplayType = "Motion Time State", IsMotionTimed = true, CanEdit = false};
                         return true;
                     }
 
-                    return false;
                 }
                 default:
                 {
-                    HashSet<AnimatorState> visitedStates = new HashSet<AnimatorState>();
-                    Dictionary<float, AnimatorState> endStates = new Dictionary<float, AnimatorState>();
+                    var visitedStates = new HashSet<AnimatorState>();
+                    var endStates = new Dictionary<float, AnimatorState>();
 
-                    bool success = false;
+                    var success = false;
 
-                    bool Failure() => !(success = false);
-                    bool foundBehaviours = false;
-                    bool foundLoopingZeroSpeed = false;
-                    bool foundNonInstantTransitions = false;
+                    var foundBehaviours = false;
+                    var foundLoopingZeroSpeed = false;
+                    var foundNonInstantTransitions = false;
 
                     layer.stateMachine.Iteratetransitions(t =>
                     {
                         if (t.mute) return false;
-                        if (t.destinationStateMachine) return Failure();
-                        if (!t.conditions.Any()) return Failure();
-                        if (builtinParameters.Contains(t.conditions[0].parameter)) return Failure();
+                        if (t.destinationStateMachine) return Failure(out success);
+                        if (!t.conditions.Any()) return Failure(out success);
+                        if (BuiltinParameters.Contains(t.conditions[0].parameter)) return Failure(out success);
 
-                        for (int i = 1; i < t.conditions.Length; i++)
+                        for (var i = 1; i < t.conditions.Length; i++)
                         {
-                            if (!Regex.Match(t.conditions[i].parameter, @"^(?i)isloaded").Success && !Regex.Match(t.conditions[i].parameter, @"^(?i)hasloaded").Success)
-                                return Failure();
+                            if (!Regex.Match(t.conditions[i].parameter, "^(?i)isloaded").Success && !Regex.Match(t.conditions[i].parameter, "^(?i)hasloaded").Success)
+                                return Failure(out success);
                         }
 
 
                         if (t.destinationState)
                         {
                             var c = t.conditions[0];
-                            if (!string.IsNullOrEmpty(parameter) && parameter != c.parameter) return Failure();
+                            if (!string.IsNullOrEmpty(parameter) && parameter != c.parameter) return Failure(out success);
                             parameter = c.parameter;
 
 
-                            float standardizedThreshold = c.threshold;
+                            var standardizedThreshold = c.threshold;
                             var dState = t.destinationState;
 
                             switch (c.mode)
                             {
-                                case AnimatorConditionMode.NotEqual: return Failure();
+                                case AnimatorConditionMode.NotEqual: return Failure(out success);
                                 case AnimatorConditionMode.IfNot:
                                     standardizedThreshold = 0;
                                     break;
@@ -137,16 +135,20 @@ namespace DreadScripts.BlendTreeBulder
                                 case AnimatorConditionMode.Greater:
                                     warnReport.AppendLine("\n- Parameter conditions are not exact. Less & Greater conditions are not handled accurately yet.");
                                     break;
+                                case AnimatorConditionMode.Equals:
+                                    break;
+                                default:
+                                    throw new ArgumentOutOfRangeException();
                             }
 
                             if (endStates.TryGetValue(standardizedThreshold, out AnimatorState endState))
                             {
                                 if (endState != dState)
-                                    return Failure();
+                                    return Failure(out success);
                             }
                             else
                             {
-                                if (visitedStates.Contains(dState)) return Failure();
+                                if (visitedStates.Contains(dState)) return Failure(out success);
                                 endStates.Add(standardizedThreshold, dState);
                                 if (!foundLoopingZeroSpeed && dState.speed == 0 && dState.motion && dState.motion.isLooping)
                                 {
@@ -180,17 +182,17 @@ namespace DreadScripts.BlendTreeBulder
                     });
                     if (!success) return false;
 
-                    AnimatorControllerParameter animParameter = controller.parameters.FirstOrDefault(p => p.name == parameter);
+                    var animParameter = controller.parameters.FirstOrDefault(p => p.name == parameter);
                     if (animParameter != null)
                     {
                         if (animParameter.type != AnimatorControllerParameterType.Float)
                         {
-                            bool wasReused = false;
+                            var wasReused = false;
                             foreach (var layer2 in controller.layers)
                             {
                                 if (layer2.stateMachine == layer.stateMachine) continue;
 
-                                bool parameterReused = false;
+                                var parameterReused = false;
                                 layer2.stateMachine.Iteratetransitions(t => parameterReused = t.conditions.Any(c => c.parameter == parameter));
 
                                 if (!parameterReused) continue;
@@ -211,7 +213,7 @@ namespace DreadScripts.BlendTreeBulder
 
 
                     var newChildren = new ChildMotion[endStates.Count];
-                    int currentIndex = 0;
+                    var currentIndex = 0;
                     foreach (var (threshold, state) in endStates)
                     {
                         newChildren[currentIndex++] = new ChildMotion
@@ -224,47 +226,48 @@ namespace DreadScripts.BlendTreeBulder
 
 
 
-                    var baseBranch = new Branch()
+                    var baseBranch = new Branch
                     {
-                        name = name,
-                        parameter = parameter,
-                        childMotions = newChildren
+                        Name = name,
+                        Parameter = parameter,
+                        ChildMotions = newChildren
                     };
 
-                    string infoLog = infoReport.ToString();
+                    var infoLog = infoReport.ToString();
                     if (!string.IsNullOrEmpty(infoLog)) infoLog = ("Behaviour may be different due to the following reasons:\n" + infoLog).Trim();
 
 
-                    string warnLog = warnReport.ToString();
+                    var warnLog = warnReport.ToString();
                     if (!string.IsNullOrEmpty(warnLog)) warnLog = ("Behaviour is likely to be different due to the following reasons:\n" + warnLog).Trim();
 
-                    string errorLog = errorReport.ToString();
+                    var errorLog = errorReport.ToString();
                     if (!string.IsNullOrEmpty(errorLog)) errorLog = ("Some stuff may break for these reasons:\n" + errorLog).Trim();
 
                     var active = string.IsNullOrEmpty(errorLog) && string.IsNullOrEmpty(warnLog);
-                    optBranch = new OptimizeBranch(baseBranch) {linkedLayer = layer, linkedLayerIndex = layerIndex, displayType = endStates.Count == 2 ? "Toggle" : "Exclusive Toggle", isActive = active,infoLog = infoLog, warnLog = warnLog, errorLog = errorLog};
+                    optBranch = new OptimizeBranch(baseBranch) {LinkedLayer = layer, LinkedLayerIndex = layerIndex, DisplayType = endStates.Count == 2 ? "Toggle" : "Exclusive Toggle", IsActive = active,InfoLog = infoLog, WarnLog = warnLog, ErrorLog = errorLog};
 
                     return true;
 
+                    bool Failure(out bool success) => !(success = false);
                 }
             }
 
         }
 
-        public static implicit operator Branch(OptimizeBranch b) => b.baseBranch;
+        public static implicit operator Branch(OptimizeBranch b) => b.BaseBranch;
     }
 
     public class OptimizationInfo
     {
-        public AnimatorController targetController;
-        public BlendTree masterTree;
-        public readonly List<OptimizeBranch> optBranches = new List<OptimizeBranch>();
-        public int Count => optBranches.Count;
+        public AnimatorController TargetController;
+        public BlendTree MasterTree;
+        public readonly List<OptimizeBranch> OptBranches = new();
+        public int Count => OptBranches.Count;
 
 
         public void Add(OptimizeBranch branch)
-            => optBranches.Add(branch);
+            => OptBranches.Add(branch);
 
-        public OptimizeBranch this[int i] => optBranches[i];
+        public OptimizeBranch this[int i] => OptBranches[i];
     }
 }

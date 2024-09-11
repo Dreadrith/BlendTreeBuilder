@@ -3,52 +3,48 @@ using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace DreadScripts.BlendTreeBulder
+namespace Editor
 {
     public static class BlendTreeBuilderCustomGUI
     {
         internal sealed class IsolatedDisableScope : IDisposable
         {
-            private readonly bool wasEnabled;
+            private readonly bool _wasEnabled;
 
             public IsolatedDisableScope(bool disabled)
             {
-                wasEnabled = GUI.enabled;
+                _wasEnabled = GUI.enabled;
                 GUI.enabled = !disabled;
             }
             public void Dispose()
             {
-                GUI.enabled = wasEnabled;
+                GUI.enabled = _wasEnabled;
             }
         }
 
-        public class BGColoredScope : System.IDisposable
+        public class BgColoredScope : IDisposable
         {
-            private readonly Color ogColor;
-            public BGColoredScope(Color setColor)
+            private readonly Color _ogColor;
+            public BgColoredScope(Color setColor)
             {
-                ogColor = GUI.backgroundColor;
+                _ogColor = GUI.backgroundColor;
                 GUI.backgroundColor = setColor;
             }
-            public BGColoredScope(bool isActive, Color setColor )
+
+            public BgColoredScope(bool isActive, Color active, Color inactive)
             {
-                ogColor = GUI.backgroundColor;
-                GUI.backgroundColor = isActive ? setColor : ogColor;
-            }
-            public BGColoredScope(bool isActive, Color active, Color inactive)
-            {
-                ogColor = GUI.backgroundColor;
+                _ogColor = GUI.backgroundColor;
                 GUI.backgroundColor = isActive ? active : inactive;
             }
 
-            public BGColoredScope(int selectedIndex, params Color[] colors)
+            public BgColoredScope(int selectedIndex, params Color[] colors)
             {
-                ogColor = GUI.backgroundColor;
+                _ogColor = GUI.backgroundColor;
                 GUI.backgroundColor = colors[selectedIndex];
             }
             public void Dispose()
             {
-                GUI.backgroundColor = ogColor;
+                GUI.backgroundColor = _ogColor;
             }
         }
         public class TitledScope : IDisposable
@@ -56,19 +52,7 @@ namespace DreadScripts.BlendTreeBulder
             internal TitledScope(string title, params GUILayoutOption[] options)
             {
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox, options);
-                EditorGUILayout.LabelField(title, Styles.titleLabel);
-                DrawSeparator();
-            }
-
-            internal TitledScope( string title, Action prevGUI, Action afterGUI, params GUILayoutOption[] options)
-            {
-                EditorGUILayout.BeginVertical(EditorStyles.helpBox, options);
-                using (new GUILayout.HorizontalScope())
-                {
-                    prevGUI();
-                    EditorGUILayout.LabelField(title, Styles.titleLabel);
-                    afterGUI();
-                }
+                EditorGUILayout.LabelField(title, Styles.TitleLabel);
                 DrawSeparator();
             }
 
@@ -77,42 +61,42 @@ namespace DreadScripts.BlendTreeBulder
 
         public static class Styles
         {
-            public static readonly GUIStyle faintLabel
-                = new GUIStyle(GUI.skin.label)
+            public static readonly GUIStyle FaintLabel
+                = new(GUI.skin.label)
                 {
                     fontSize = 11,
                     contentOffset = new Vector2(-2.5f, 1.5f),
                     normal = { textColor = EditorGUIUtility.isProSkin ? Color.gray : new Color(0.357f, 0.357f, 0.357f) }
                 };
 
-            public static readonly GUIStyle italicFaintLabel
-                = new GUIStyle(faintLabel)
+            public static readonly GUIStyle ItalicFaintLabel
+                = new(FaintLabel)
                 {
                     fontStyle = FontStyle.Italic,
                 };
 
-            public static readonly GUIStyle placeHolderLabel
-                = new GUIStyle(italicFaintLabel)
+            public static readonly GUIStyle PlaceHolderLabel
+                = new(ItalicFaintLabel)
                 {
                     alignment = TextAnchor.MiddleRight,
                     contentOffset = new Vector2(-2.5f, 0),
                 };
 
-            public static readonly GUIStyle typeLabel
-                = new GUIStyle(italicFaintLabel)
+            public static readonly GUIStyle TypeLabel
+                = new(ItalicFaintLabel)
                 { alignment = TextAnchor.MiddleRight};
 
-            public static readonly GUIStyle centeredLabel = new GUIStyle(EditorStyles.largeLabel)
+            private static readonly GUIStyle CenteredLabel = new(EditorStyles.largeLabel)
             {
                 alignment = TextAnchor.MiddleCenter,
                 fontStyle = FontStyle.Bold,
             };
 
-            public static readonly GUIStyle titleLabel = new GUIStyle(centeredLabel) {fontSize = 18, clipping = TextClipping.Overflow};
-            public static readonly GUIStyle wrappedLabel = new GUIStyle(GUI.skin.label) {wordWrap = true};
+            public static readonly GUIStyle TitleLabel = new(CenteredLabel) {fontSize = 18, clipping = TextClipping.Overflow};
+            public static readonly GUIStyle WrappedLabel = new(GUI.skin.label) {wordWrap = true};
 
-            public static readonly GUIStyle iconButton
-                = new GUIStyle()
+            public static readonly GUIStyle IconButton
+                = new()
                 {
                     padding = new RectOffset(1, 1, 1, 1),
                     margin = new RectOffset(),
@@ -120,14 +104,14 @@ namespace DreadScripts.BlendTreeBulder
                     contentOffset = new Vector2(0, 2)
                 };
 
-            public static readonly GUIStyle foldoutLabel = new GUIStyle(GUI.skin.label)
+            public static readonly GUIStyle FoldoutLabel = new(GUI.skin.label)
             {
                 padding = new RectOffset(1, 1, 1, 1),
                 margin = new RectOffset(),
                 contentOffset = new Vector2(0, 2)
             };
 
-            public static readonly GUIStyle comicallyLargeButton = new GUIStyle(GUI.skin.button)
+            public static readonly GUIStyle ComicallyLargeButton = new(GUI.skin.button)
             {
                 fontSize = 22,
                 fontStyle = FontStyle.Bold
@@ -136,24 +120,24 @@ namespace DreadScripts.BlendTreeBulder
 
         public static class Content
         {
-            public static readonly GUIContent greenLightIcon = EditorGUIUtility.IconContent("greenLight");
-            public static readonly GUIContent orangeLightIcon = EditorGUIUtility.IconContent("orangeLight");
-            public static readonly GUIContent backIcon = EditorGUIUtility.IconContent("back");
-            public static readonly GUIContent infoIcon = EditorGUIUtility.IconContent("console.warnicon.inactive.sml");
-            public static readonly GUIContent warnIcon = EditorGUIUtility.IconContent("console.warnicon.sml");
-            public static readonly GUIContent errorIcon = EditorGUIUtility.IconContent("CollabError");
-            public static readonly GUIContent foldoutIconOff = EditorGUIUtility.IconContent("IN foldout");
-            public static readonly GUIContent foldoutIconOn = EditorGUIUtility.IconContent("IN foldout on");
+            public static readonly GUIContent GreenLightIcon = EditorGUIUtility.IconContent("greenLight");
+            public static readonly GUIContent OrangeLightIcon = EditorGUIUtility.IconContent("orangeLight");
+            public static readonly GUIContent BackIcon = EditorGUIUtility.IconContent("back");
+            public static readonly GUIContent InfoIcon = EditorGUIUtility.IconContent("console.warnicon.inactive.sml");
+            public static readonly GUIContent WarnIcon = EditorGUIUtility.IconContent("console.warnicon.sml");
+            public static readonly GUIContent ErrorIcon = EditorGUIUtility.IconContent("CollabError");
+            public static readonly GUIContent FoldoutIconOff = EditorGUIUtility.IconContent("IN foldout");
+            public static readonly GUIContent FoldoutIconOn = EditorGUIUtility.IconContent("IN foldout on");
         }
 
         public static void DrawSeparator(int thickness = 2, int padding = 10)
         {
-            Rect r = EditorGUILayout.GetControlRect(GUILayout.Height(thickness + padding));
+            var r = EditorGUILayout.GetControlRect(GUILayout.Height(thickness + padding));
             r.height = thickness;
             r.y += padding / 2f;
             r.x -= 2;
             r.width += 6;
-            ColorUtility.TryParseHtmlString(EditorGUIUtility.isProSkin ? "#595959" : "#858585", out Color lineColor);
+            ColorUtility.TryParseHtmlString(EditorGUIUtility.isProSkin ? "#595959" : "#858585", out var lineColor);
             EditorGUI.DrawRect(r, lineColor);
         }
 
@@ -204,12 +188,10 @@ namespace DreadScripts.BlendTreeBulder
                 {
                     DrawOrangeLightIcon(msg);
                     refObject = refObject.QuickField(label);
-                    if (autoFixAction != null)
-                    {
-                        using (new BGColoredScope(ColorOrange))
-                            if (GUILayout.Button(fixLabel, GUILayout.ExpandWidth(false)))
-                                autoFixAction();
-                    }
+                    if (autoFixAction == null) return;
+                    using (new BgColoredScope(ColorOrange))
+                        if (GUILayout.Button(fixLabel, GUILayout.ExpandWidth(false)))
+                            autoFixAction();
                 }
                 
 
@@ -220,40 +202,43 @@ namespace DreadScripts.BlendTreeBulder
         {
             using (new GUILayout.HorizontalScope())
             {
-                GUILayout.Label(Content.greenLightIcon, GUILayout.Width(28), GUILayout.Height(28));
-                GUILayout.Label(msg, Styles.wrappedLabel, GUILayout.Height(28));
+                GUILayout.Label(Content.GreenLightIcon, GUILayout.Width(28), GUILayout.Height(28));
+                GUILayout.Label(msg, Styles.WrappedLabel, GUILayout.Height(28));
             }
         }
         public static void DrawWarning(string msg)
         {
             using (new GUILayout.HorizontalScope())
             {
-                GUILayout.Label(Content.orangeLightIcon, GUILayout.Width(28), GUILayout.Height(28));
-                GUILayout.Label(msg, Styles.wrappedLabel, GUILayout.Height(28));
+                GUILayout.Label(Content.OrangeLightIcon, GUILayout.Width(28), GUILayout.Height(28));
+                GUILayout.Label(msg, Styles.WrappedLabel, GUILayout.Height(28));
             }
         }
 
         private static void DrawLightIcon(bool isGreen, string tooltip)
-            => GUILayout.Label(new GUIContent(isGreen ? Content.greenLightIcon : Content.orangeLightIcon) { tooltip = tooltip }, GUILayout.Width(18), GUILayout.Height(18));
-        public static void DrawGreenLightIcon(string tooltip)
+            => GUILayout.Label(new GUIContent(isGreen ? Content.GreenLightIcon : Content.OrangeLightIcon) { tooltip = tooltip }, GUILayout.Width(18), GUILayout.Height(18));
+
+        private static void DrawGreenLightIcon(string tooltip)
             => DrawLightIcon(true, tooltip);
-        public static void DrawOrangeLightIcon(string tooltip)
+
+        private static void DrawOrangeLightIcon(string tooltip)
             => DrawLightIcon(false, tooltip);
 
-        internal static void DoPlaceholderLabel(Rect r, string label, float minimumWidth = 0, float extraOffset = 0, GUIStyle customStyle = null)
+        private static void DoPlaceholderLabel(Rect r, string label, float minimumWidth = 0, float extraOffset = 0, GUIStyle customStyle = null)
         {
             if (!(r.width > minimumWidth + extraOffset)) return;
             r.x -= extraOffset;
-            GUI.Label(r, label, customStyle ?? Styles.placeHolderLabel);
+            GUI.Label(r, label, customStyle ?? Styles.PlaceHolderLabel);
         }
         internal static void DoPlaceholderLabel(string label, float minimumWidth = 0, float extraOffset = 0, GUIStyle customStyle = null) => DoPlaceholderLabel(GUILayoutUtility.GetLastRect(), label, minimumWidth, extraOffset, customStyle);
 
 
         public static T QuickField<T>(this T target, GUIContent label) where T : Object
             =>  (T)EditorGUILayout.ObjectField(label, target, typeof(T), true);
-        public static T QuickField<T>(this T target, string label) where T : Object 
+
+        private static T QuickField<T>(this T target, string label) where T : Object 
             => target.QuickField(new GUIContent(label));
 
-        public static Color ColorOrange = new Color(0.992f, 0.784f, 0.4f);
+        public static Color ColorOrange = new(0.992f, 0.784f, 0.4f);
     }
 }
